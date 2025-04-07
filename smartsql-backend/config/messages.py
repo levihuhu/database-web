@@ -3,7 +3,7 @@
 # 登录相关
 #ERROR
 LOGIN_USER_NOT_FOUND = "User does not exist"
-LOGIN_WRONG_PASSWORD = "Username/Email and Password mismatched record"
+LOGIN_WRONG_PASSWORD = "Wrong credentials or wrong user type"
 MISSING_FIELD = "Missing field"
 
 #SUCCESS

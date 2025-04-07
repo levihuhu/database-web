@@ -1,16 +1,17 @@
 import React, { useState } from 'react';
+import { Outlet } from 'react-router-dom';
 import { Layout, Menu, Avatar, Dropdown, Space, Typography } from 'antd';
-import { 
-  UserOutlined, 
-  DashboardOutlined, 
-  TeamOutlined, 
+import {
+  UserOutlined,
+  DashboardOutlined,
+  TeamOutlined,
   BookOutlined,
   BarChartOutlined,
   SettingOutlined,
   LogoutOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
-  DatabaseOutlined
+  DatabaseOutlined, OrderedListOutlined
 } from '@ant-design/icons';
 import { Link, useLocation } from 'react-router-dom';
 
@@ -20,35 +21,36 @@ const { Title, Text } = Typography;
 const TeacherLayout = ({ children }) => {
   const [collapsed, setCollapsed] = useState(false);
   const location = useLocation();
+  const teacherPrefix= '/teacher'
 
   const menuItems = [
     {
-      key: '/',
-      icon: <DashboardOutlined />,
-      label: <Link to="/">Dashboard</Link>,
-    },
-    {
-      key: '/students',
-      icon: <TeamOutlined />,
-      label: <Link to="/students">Student Management</Link>,
-    },
-    {
-      key: '/grades',
-      icon: <BarChartOutlined />,
-      label: <Link to="/grades">Grade Management</Link>,
-    },
-    {
-      key: '/courses',
+      key: `${teacherPrefix}/courses`,
       icon: <BookOutlined />,
-      label: <Link to="/courses">Course Management</Link>,
+      label: <Link to={`${teacherPrefix}/courses`}>Course Management</Link>,
     },
     {
-      key: '/sql-exercises',
+      key: `${teacherPrefix}/modules`,
+      icon: <OrderedListOutlined />,
+      label: <Link to={`${teacherPrefix}/modules`}>Module Management</Link>,
+    },
+    {
+      key: `${teacherPrefix}/sql-exercises`,
       icon: <DatabaseOutlined />,
-      label: <Link to="/sql-exercises">SQL Exercises</Link>,
+      label: <Link to={`${teacherPrefix}/sql-exercises`}>Exercises Management</Link>,
     },
     {
-      key: '/settings',
+      key: `${teacherPrefix}/students`,
+      icon: <TeamOutlined />,
+      label: <Link to={`${teacherPrefix}/students`}>Student Management</Link>,
+    },
+    {
+      key: `${teacherPrefix}/grades`,
+      icon: <BarChartOutlined />,
+      label: <Link to={`${teacherPrefix}/grades`}>Grade Management</Link>,
+    },
+    {
+      key: '/settings', //
       icon: <SettingOutlined />,
       label: <Link to="/settings">System Settings</Link>,
     },
@@ -143,7 +145,7 @@ const TeacherLayout = ({ children }) => {
             borderRadius: 4
           }}
         >
-          {children}
+          <Outlet />
         </Content>
       </Layout>
     </Layout>

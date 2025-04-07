@@ -5,8 +5,7 @@ from django.db import models
 
 class Users(models.Model):
     USER_TYPE_CHOICES = (
-        ('Student', 'Student'),
-        ('Instructor', 'Instructor'),
+        ('student', 'instructor'),
     )
 
     user_id = models.AutoField(primary_key=True)
@@ -19,6 +18,10 @@ class Users(models.Model):
     @property
     def id(self):
         return self.user_id
+
+    @property
+    def is_authenticated(self):
+        return True
 
     class Meta:
         db_table = 'Users'
