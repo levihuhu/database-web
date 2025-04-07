@@ -16,12 +16,13 @@ class Users(models.Model):
     user_type = models.CharField(max_length=10, choices=USER_TYPE_CHOICES)
     profile_info = models.TextField(blank=True, null=True)
 
+    @property
+    def id(self):
+        return self.user_id
+
     class Meta:
         db_table = 'Users'
         managed = False  # 👈 因为数据库表已经建好了
-
-    def __str__(self):
-        return f"{self.username} ({self.user_type})"
 
 
 class Student(models.Model):
@@ -31,9 +32,6 @@ class Student(models.Model):
         db_table = 'Student'
         managed = False
 
-    def __str__(self):
-        return f"Student: {self.student.username}"
-
 
 class Instructor(models.Model):
     instructor = models.OneToOneField(Users, on_delete=models.CASCADE, primary_key=True)
@@ -42,5 +40,3 @@ class Instructor(models.Model):
         db_table = 'Instructor'
         managed = False
 
-    def __str__(self):
-        return f"Instructor: {self.instructor.username}"

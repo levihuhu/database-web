@@ -1,5 +1,6 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import HomeLogin from './pages/HomeLogin';
 import TeacherDashboard from './pages/TeacherDashboard';
 import TeacherLayout from './components/layout/TeacherLayout';
 import StudentAIChat from './pages/StudentAIChat';
@@ -7,6 +8,7 @@ import StudentSQLCamp from './pages/StudentSQLCamp';
 import SQLExercise from './pages/SQLExercise';
 import SQLExerciseManagement from './pages/SQLExerciseManagement'; // Make sure this import is correct
 import './App.css';
+
 
 function App() {
   return (
@@ -33,7 +35,7 @@ function App() {
         <Route path="/student/sql/:moduleId/:exerciseId" element={<SQLExercise />} />
         
         {/* Default redirect */}
-        <Route path="/" element={<Navigate to="/student/sql" replace />} />
+        <Route path="/" element={<HomeLogin />} />
       </Routes>
     </Router>
   );
