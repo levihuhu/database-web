@@ -280,7 +280,7 @@ const TeacherDashboard = () => {
           <Card>
             <Row justify="space-between" align="middle">
               <Col>
-                <Title level={4}>Teacher Dashboard</Title>
+                <Title level={4}>Instructor Dashboard</Title>
                 <Text type="secondary">Welcome back, Mr. Smith! Here's the latest data for your classes.</Text>
               </Col>
               <Col>

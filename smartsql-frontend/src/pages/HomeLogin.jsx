@@ -8,9 +8,12 @@ import {
   Radio,
   Checkbox,
   message,
+  Modal,
   Row,
   Col
 } from 'antd';
+import { handleError } from "../services/utils.js";
+
 
 const { Title, Text } = Typography;
 const BASE_URL = import.meta.env.VITE_API_BASE_URL;
@@ -20,25 +23,42 @@ export default function HomeLogin() {
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [form]  = Form.useForm();
 
   const handleLogin = async () => {
     setLoading(true);
-    const res = await fetch(`${BASE_URL}/api/login/`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ identifier, password, role })
-    });
 
-    setLoading(false);
-
-    if (res.ok) {
-      message.success('Login successful!');
-      window.location.href = '/dashboard';
-    } else {
+    try {
+      const res = await fetch(`${BASE_URL}/api/login/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ identifier, password, role })
+      });
       const result = await res.json();
-      message.error(result.message || 'Login failed!');
+
+      if (res.ok) {
+        // message.success('Login successful!');
+        const { access, refresh, user_id, username } = result.data;
+        localStorage.setItem('access', access);
+        localStorage.setItem('refresh', refresh);
+        localStorage.setItem('user_id', user_id);
+        localStorage.setItem('username', username);
+        localStorage.setItem('role', role);
+
+        if (role === 'instructor') {
+          window.location.href = '/teacher'
+        } else window.location.href = '/student/sql';
+      } else {
+        // message.error(result.message || 'Login failed!');
+        throw new Error(result.message);
+      }
+    } catch (error) {
+      console.error('Login error caught:', error);
+      handleError(error);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -70,19 +90,13 @@ export default function HomeLogin() {
               <Title level={4} style={{ textAlign: 'center', marginBottom: '2rem' }}>
                 Login to SmartSQL
               </Title>
-
-              <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
-                <Radio.Group
-                  value={role}
-                  onChange={(e) => setRole(e.target.value)}
-                  buttonStyle="solid"
-                >
-                  <Radio.Button value="instructor">Instructor</Radio.Button>
-                  <Radio.Button value="student">Student</Radio.Button>
-                </Radio.Group>
-              </div>
-
-              <Form layout="vertical" onFinish={handleLogin}>
+              <Form layout="vertical" form={form} onFinish={handleLogin}>
+                <Form.Item name="role" initialValue="instructor" style={{ textAlign: 'center' }}>
+                  <Radio.Group buttonStyle="solid">
+                    <Radio.Button value="instructor">Instructor</Radio.Button>
+                    <Radio.Button value="student">Student</Radio.Button>
+                  </Radio.Group>
+                </Form.Item>
                 <Form.Item
                   label="User ID / Email"
                   name="identifier"
