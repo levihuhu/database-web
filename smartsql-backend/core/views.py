@@ -24,6 +24,11 @@ def login_api(request):
         if not identifier or not password or not role:
             return Response({'error': msg.MISSING_FIELD}, status=status.HTTP_400_BAD_REQUEST)
 
+        # 验证密码（这里假设 password 是明文，实际应加密）
+        # if not check_password(password, user.password):
+        if password != user.password:
+            messages.error(request, msg.LOGIN_WRONG_PASSWORD)
+            return redirect('test2')
         # if '@' in identifier:
         #     user = authenticate(request, email=identifier, password=password)
         # else:
