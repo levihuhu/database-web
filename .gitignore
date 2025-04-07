@@ -1,0 +1,35 @@
+# Python 缓存文件
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# 虚拟环境
+.venv/
+venv/
+
+# Django 迁移历史（可选忽略）
+*.sqlite3
+db.sqlite3
+
+# 本地配置文件
+.env
+*.log
+*.pot
+*.pyc
+
+# VS Code
+.vscode/
+
+# PyCharm
+.idea/
+
+# macOS 文件
+.DS_Store
+
+# 静态资源收集
+/staticfiles/
+
+# GCP/部署文件（按需忽略）
+.gcloudignore
+app.yaml
