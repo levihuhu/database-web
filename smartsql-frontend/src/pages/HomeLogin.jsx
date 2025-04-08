@@ -25,9 +25,10 @@ export default function HomeLogin() {
   const [loading, setLoading] = useState(false);
   const [form]  = Form.useForm();
 
-  const handleLogin = async () => {
-    setLoading(true);
+  const handleLogin = async (values) => {
+    const { identifier, password, role } = values;
 
+    setLoading(true);
     try {
       const res = await fetch(`${BASE_URL}/api/login/`, {
         method: 'POST',
@@ -36,11 +37,12 @@ export default function HomeLogin() {
         },
         body: JSON.stringify({ identifier, password, role })
       });
+
       const result = await res.json();
 
       if (res.ok) {
-        // message.success('Login successful!');
-        const { access, refresh, user_id, username } = result.data;
+        const { access, refresh, user_id, username } = result;
+
         localStorage.setItem('access', access);
         localStorage.setItem('refresh', refresh);
         localStorage.setItem('user_id', user_id);
@@ -48,19 +50,21 @@ export default function HomeLogin() {
         localStorage.setItem('role', role);
 
         if (role === 'instructor') {
-          window.location.href = '/teacher'
-        } else window.location.href = '/student/sql';
+          window.location.href = '/teacher';
+        } else {
+          window.location.href = '/student/sql';
+        }
       } else {
-        // message.error(result.message || 'Login failed!');
-        throw new Error(result.message);
+        throw new Error(result.message || 'Login failed');
       }
     } catch (error) {
-      console.error('Login error caught:', error);
-      handleError(error);
+      console.error('Login error:', error);
+      message.error(error.message);
     } finally {
       setLoading(false);
     }
   };
+
 
   return (
     <Row justify="center" align="middle" style={{ minHeight: '100vh', backgroundColor: '#f5f5f5' }}>
@@ -97,16 +101,13 @@ export default function HomeLogin() {
                     <Radio.Button value="student">Student</Radio.Button>
                   </Radio.Group>
                 </Form.Item>
+
                 <Form.Item
                   label="User ID / Email"
                   name="identifier"
                   rules={[{ required: true, message: 'Please enter your identifier' }]}
                 >
-                  <Input
-                    value={identifier}
-                    onChange={(e) => setIdentifier(e.target.value)}
-                    placeholder="Enter your username or email"
-                  />
+                  <Input placeholder="Enter your username or email" />
                 </Form.Item>
 
                 <Form.Item
@@ -114,11 +115,7 @@ export default function HomeLogin() {
                   name="password"
                   rules={[{ required: true, message: 'Please enter your password' }]}
                 >
-                  <Input.Password
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Enter your password"
-                  />
+                  <Input.Password placeholder="Enter your password" />
                 </Form.Item>
 
                 <Form.Item>

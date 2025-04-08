@@ -33,13 +33,13 @@ def login_api(request):
             user = Users.objects.get(
                 Q(username=identifier) | Q(email=identifier),
                 password=password,
-                user_type=role  # 角色必须一致
+                user_type=role
             )
         except Users.DoesNotExist:
             return Response({'status': 'error', 'message': msg.LOGIN_WRONG_PASSWORD},
                             status=status.HTTP_401_UNAUTHORIZED)
 
-        refresh = RefreshToken.for_user(user)   # user 只是占位，不验证 Django 的权限
+        refresh = RefreshToken.for_user(user)
         refresh["user_id"] = user.user_id
         refresh["username"] = user.username
         refresh["role"] = user.user_type
