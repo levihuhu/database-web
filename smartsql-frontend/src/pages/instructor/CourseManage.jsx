@@ -17,7 +17,7 @@ import {
 } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 // 你已有的 axios 实例
-import apiClient from '../services/api';
+import apiClient from '../../services/api';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -34,45 +34,36 @@ export default function InstructorCourseManage() {
   const [editingCourse, setEditingCourse] = useState(null);
   const [form] = Form.useForm();
 
-  // 1. 加载课程列表
+  // 1. 加载课程列表 (确认后端返回结构)
   const fetchInstructorCourses = async () => {
-    const res = await apiClient.get('/api/instructor/courses/');
-    // 后端返回 { courses: [...] }
-    return res.data?.courses || [];
+    try {
+      setLoading(true);
+      const res = await apiClient.get('/api/instructor/courses/');
+      // 确认后端返回的数据结构，例如 { courses: [...] } 或直接 [...]
+      const coursesData = res.data?.courses || res.data || []; 
+      setCourses(coursesData);
+    } catch (err) {
+      console.error('Failed to fetch courses:', err);
+      message.error('Failed to load courses');
+      setCourses([]); // 出错时清空列表
+    } finally {
+      setLoading(false);
+    }
   };
 
+  // useEffect 中调用 fetchInstructorCourses
   useEffect(() => {
-    const loadCourses = async () => {
-      try {
-        setLoading(true);
-        // 也可以改成后端真实数据
-        const result = await fetchInstructorCourses();
-
-        // 如果你后端没有 enrolled_count，mock 一个
-        const mockWithEnrolledCount = result.map((c) => ({
-          ...c,
-          enrolled_count: c.enrolled_count || 0, // 默认 0
-        }));
-
-        setCourses(mockWithEnrolledCount);
-      } catch (err) {
-        console.error('Failed to fetch courses:', err);
-        message.error('Failed to load courses');
-      } finally {
-        setLoading(false);
-      }
-    };
-    loadCourses();
+    fetchInstructorCourses();
   }, []);
 
-  // 2. “Add Course” 按钮
+  // 2. "Add Course" 按钮
   const handleAddCourse = () => {
     setEditingCourse(null);
     form.resetFields();
     setModalVisible(true);
   };
 
-  // 3. “Edit” 按钮
+  // 3. "Edit" 按钮
   const handleEditCourse = (course) => {
     setEditingCourse(course);
     form.setFieldsValue({
@@ -86,46 +77,50 @@ export default function InstructorCourseManage() {
     setModalVisible(true);
   };
 
-  // 4. “Delete” 按钮
-  const handleDeleteCourse = (course) => {
-    // 如果有学生选课 enrolled_count > 0，就不能删除
-    if (course.enrolled_students > 0) {
-      // message.warning(`Cannot delete: ${course.course_name} has enrolled students.`);
-      alert(`Cannot delete: ${course.course_name} has enrolled students.`);
-      return;
+  // 4. "Delete" 按钮
+  const handleDeleteCourse = async (course) => {
+    // 如果后端会处理这个逻辑，可以去掉前端检查
+    // if (course.enrolled_students > 0) {
+    //   message.warning(`Cannot delete: ${course.course_name} has enrolled students.`);
+    //   return;
+    // }
+    
+    try {
+      setLoading(true); // 开始加载状态
+      await apiClient.delete(`/api/instructor/courses/delete/?course_id=${course.course_id}`);
+      message.success('Course deleted successfully');
+      await fetchInstructorCourses(); // 重新获取最新课程列表
+    } catch (error) {
+      console.error('Failed to delete course:', error);
+      message.error('Failed to delete course: ' + (error.response?.data?.detail || error.message));
+    } finally {
+      setLoading(false); // 结束加载状态
     }
-    // 向后端发请求或在前端移除
-    const updated = courses.filter((c) => c.course_id !== course.course_id);
-    setCourses(updated);
-    message.success('Course deleted successfully');
   };
 
-  // 5. Modal “OK”提交
+  // 5. Modal "OK"提交
   const handleModalOk = () => {
-    form.validateFields().then((values) => {
-      if (editingCourse) {
-        // Update existing course
-        const newList = courses.map((c) =>
-          c.course_id === editingCourse.course_id
-            ? { ...c, ...values }
-            : c
-        );
-        setCourses(newList);
-        message.success('Course updated successfully');
-      } else {
-        // Add new course
-        const newId = Math.max(0, ...courses.map((c) => c.course_id)) + 1;
-        const newCourse = {
-          course_id: newId,
-          enrolled_count: 0, // 默认 0
-          ...values,
-        };
-        setCourses([...courses, newCourse]);
-        message.success('Course added successfully');
+    form.validateFields().then(async (values) => {
+      try {
+        setLoading(true);
+        if (editingCourse) {
+          // 更新现有课程
+          await apiClient.put(`/api/instructor/courses/update/?course_id=${editingCourse.course_id}`, values);
+          message.success('Course updated successfully');
+        } else {
+          // 添加新课程
+          await apiClient.post('/api/instructor/courses/insert/', values);
+          message.success('Course added successfully');
+        }
+        setModalVisible(false);
+        form.resetFields();
+        await fetchInstructorCourses();
+      } catch (error) {
+        console.error('Failed to save course:', error);
+        message.error('Failed to save course: ' + (error.response?.data?.detail || error.message));
+      } finally {
+        setLoading(false);
       }
-
-      setModalVisible(false);
-      form.resetFields();
     });
   };
 
@@ -258,7 +253,6 @@ export default function InstructorCourseManage() {
               <Option value="Spring">Spring</Option>
               <Option value="Summer">Summer</Option>
               <Option value="Fall">Fall</Option>
-              <Option value="Winter">Winter</Option>
             </Select>
           </Form.Item>
 

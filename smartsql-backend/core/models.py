@@ -5,10 +5,13 @@ from django.db import models
 
 class Users(models.Model):
     USER_TYPE_CHOICES = (
-        ('student', 'instructor'),
+        ('Student', 'Student'),
+        ('Instructor', 'Instructor'),
     )
 
     user_id = models.AutoField(primary_key=True)
+    first_name = models.CharField(max_length=50)
+    last_name = models.CharField(max_length=50)
     username = models.CharField(max_length=50)
     email = models.EmailField(unique=True)
     password = models.CharField(max_length=255)

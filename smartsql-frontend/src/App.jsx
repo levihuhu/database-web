@@ -1,15 +1,18 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import HomeLogin from './pages/HomeLogin';
-import TeacherDashboard from './pages/TeacherDashboard';
+import HomeLogin from './pages/common/HomeLogin.jsx';
+import TeacherDashboard from './pages/instructor/TeacherDashboard.jsx';
 import TeacherLayout from './components/layout/TeacherLayout';
-import StudentAIChat from './pages/StudentAIChat';
-import StudentSQLCamp from './pages/StudentSQLCamp';
-import SQLExercise from './pages/SQLExercise';
-import SQLExerciseManage from './pages/SQLExerciseManage.jsx'; // Make sure this import is correct
+import StudentAIChat from './pages/StudentAIChat.jsx';
+import StudentSQLCamp from './pages/StudentSQLCamp.jsx';
+import SQLExercise from './pages/SQLExercise.jsx';
+import SQLExerciseManage from './pages/instructor/SQLExerciseManage.jsx'; // Make sure this import is correct
 import './App.css';
-import ModuleManage from "./pages/ModuleManage.jsx";
-import CourseManage from "./pages/CourseManage.jsx";
+import ModuleManage from "./pages/instructor/ModuleManage.jsx";
+import CourseManage from "./pages/instructor/CourseManage.jsx";
+import Profile from './pages/common/Profile.jsx';
+// 导入 SQLExerciseTest 组件
+import SQLExerciseTest from './pages/SQLExcerciseTest.jsx';
 
 
 function App() {
@@ -28,11 +31,12 @@ function App() {
         <Route path="/student" element={<StudentAIChat />} />
         <Route path="/student/sql" element={<StudentSQLCamp />} />
         {/*<Route path="/student/sql/:moduleId" element={<SQLExercise />} />*/}
-        <Route path="/student/sql1/" element={<SQLExercise />} />
-        <Route path="/student/sql/:moduleId/:exerciseId" element={<SQLExercise />} />
+        <Route path="/student/sql/:moduleId" element={<SQLExerciseTest />} />
+        <Route path="/student/sql/:moduleId/:exerciseId" element={<SQLExerciseTest />} />
         
         {/* Default redirect */}
         <Route path="/" element={<HomeLogin />} />
+        <Route path="/profile/:userId" element={<Profile />} />
       </Routes>
     </Router>
   );

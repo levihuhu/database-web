@@ -21,15 +21,17 @@ DROP TABLE IF EXISTS Question;
 DROP TABLE IF EXISTS Instructor;
 DROP TABLE IF EXISTS Student;
 DROP TABLE IF EXISTS Users;
---  Users 
 CREATE TABLE Users (
     user_id INT PRIMARY KEY,
+    first_name VARCHAR(50) NOT NULL,
+    last_name VARCHAR(50) NOT NULL,
     username VARCHAR(50) NOT NULL,
     email VARCHAR(100) NOT NULL UNIQUE,
     password VARCHAR(255) NOT NULL,
     user_type ENUM('Student', 'Instructor') NOT NULL,
     profile_info TEXT
 );
+
 
 -- Student
 CREATE TABLE Student (
@@ -47,7 +49,7 @@ CREATE TABLE Instructor (
 
 -- Course
 CREATE TABLE Course (
-    course_id INT PRIMARY KEY,
+    course_id INT AUTO_INCREMENT PRIMARY KEY,
     course_name VARCHAR(100) NOT NULL,
     course_code VARCHAR(20) NOT NULL, -- eg.CS5200
     instructor_id INT NOT NULL,
@@ -80,7 +82,7 @@ CREATE TABLE Module (
 
 -- Score
 CREATE TABLE Score (
-    score_id INT PRIMARY KEY,
+    score_id INT AUTO_INCREMENT PRIMARY KEY,
     student_id INT NOT NULL,
     course_id INT NOT NULL,
     total_score DECIMAL(10, 2),
@@ -89,38 +91,55 @@ CREATE TABLE Score (
     FOREIGN KEY (course_id) REFERENCES Course(course_id)
 );
 
--- Message
 CREATE TABLE Message (
-    message_id INT PRIMARY KEY,
+    message_id INT AUTO_INCREMENT PRIMARY KEY,
     sender_id INT NOT NULL,
-    receiver_id INT NOT NULL,
+    message_type ENUM('private', 'announcement') NOT NULL,
     message_content TEXT,
     timestamp DATETIME,
-    FOREIGN KEY (sender_id)
-        REFERENCES Users (user_id),
-    FOREIGN KEY (receiver_id)
-        REFERENCES Users (user_id)
+    FOREIGN KEY (sender_id) REFERENCES Users(user_id)
+);
+
+CREATE TABLE PrivateMessage (
+    message_id INT PRIMARY KEY,
+    receiver_id INT NOT NULL,
+    FOREIGN KEY (message_id) REFERENCES Message(message_id) ON DELETE CASCADE,
+    FOREIGN KEY (receiver_id) REFERENCES Users(user_id)
+);
+
+CREATE TABLE Announcement (
+    message_id INT PRIMARY KEY,
+    course_id INT NOT NULL,
+    FOREIGN KEY (message_id) REFERENCES Message(message_id) ON DELETE CASCADE,
+    FOREIGN KEY (course_id) REFERENCES Course(course_id)
 );
 
 CREATE TABLE Exercise (
-  exercise_id INT AUTO_INCREMENT PRIMARY KEY,
-  module_id VARCHAR(100),
-  title VARCHAR(255),
-  description TEXT,
-  hint TEXT,
-  expected_answer TEXT,
-  difficulty VARCHAR(20),
-  table_schema JSON,
-  tags VARCHAR(255),
+    exercise_id INT AUTO_INCREMENT PRIMARY KEY,
+    title VARCHAR(255),
+    description TEXT,
+    hint TEXT,
+    expected_answer TEXT,
+    difficulty VARCHAR(20),
+    table_schema JSON,
+    tags VARCHAR(255),
     created_by INT NOT NULL,
-    FOREIGN KEY (created_by)
-        REFERENCES Instructor (instructor_id)
+    FOREIGN KEY (created_by) REFERENCES Instructor(instructor_id)
+);
+
+CREATE TABLE Module_Exercise (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    module_id INT NOT NULL,
+    exercise_id INT NOT NULL,
+    display_order INT,
+    FOREIGN KEY (module_id) REFERENCES Module(module_id) ON DELETE CASCADE,
+    FOREIGN KEY (exercise_id) REFERENCES Exercise(exercise_id) ON DELETE CASCADE
 );
 
 
 -- Question
 CREATE TABLE Question (
-    question_id INT PRIMARY KEY,
+    question_id INT AUTO_INCREMENT PRIMARY KEY,
     question_text TEXT,
     difficulty_level ENUM('Easy', 'Medium', 'Hard'),
     tags VARCHAR(255),
@@ -129,34 +148,6 @@ CREATE TABLE Question (
         REFERENCES Instructor (instructor_id)
 );
 
--- Competition
-CREATE TABLE Competition (
-    competition_id INT PRIMARY KEY,
-    competition_name VARCHAR(100) NOT NULL,
-    start_time DATETIME,
-    end_time DATETIME,
-    status VARCHAR(50),
-    created_by INT NOT NULL,
-    FOREIGN KEY (created_by)
-        REFERENCES Instructor (instructor_id)
-);
-
-
--- Real_Time_Activity
-CREATE TABLE Real_Time_Activity (
-    activity_id INT PRIMARY KEY,
-    competition_id INT NOT NULL,
-    student_id INT NOT NULL,
-    question_id INT NOT NULL,
-    timestamp DATETIME,
-    status VARCHAR(50),
-    FOREIGN KEY (competition_id)
-        REFERENCES Competition (competition_id),
-    FOREIGN KEY (student_id)
-        REFERENCES Student (student_id),
-    FOREIGN KEY (question_id)
-        REFERENCES Question (question_id)
-);
 
 -- Error_Log
 CREATE TABLE Error_Log (
@@ -270,9 +261,21 @@ JOIN Course c ON sp.course_id = c.course_id;
 
 
 CREATE VIEW UserMessages AS
-SELECT m.message_id,
-       m.sender_id,
-       m.receiver_id,
-       m.message_content,
-       m.timestamp
-FROM Message m;
+SELECT
+    m.message_id,
+    m.sender_id,
+    p.receiver_id,
+    m.message_content,
+    m.timestamp
+FROM Message m
+JOIN PrivateMessage p ON m.message_id = p.message_id;
+
+CREATE VIEW CourseAnnouncements AS
+SELECT
+    m.message_id,
+    m.sender_id,
+    a.course_id,
+    m.message_content,
+    m.timestamp
+FROM Message m
+JOIN Announcement a ON m.message_id = a.message_id;

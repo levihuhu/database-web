@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useNavigate, Link, useLocation } from 'react-router-dom';
 import { Layout, Menu, Avatar, Dropdown, Space, Typography } from 'antd';
 import {
   UserOutlined,
@@ -13,14 +13,16 @@ import {
   MenuUnfoldOutlined,
   DatabaseOutlined, OrderedListOutlined
 } from '@ant-design/icons';
-import { Link, useLocation } from 'react-router-dom';
+
 
 const { Header, Sider, Content } = Layout;
 const { Title, Text } = Typography;
 
+
 const TeacherLayout = ({ children }) => {
   const [collapsed, setCollapsed] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
   const teacherPrefix= '/teacher'
 
   const menuItems = [
@@ -56,7 +58,26 @@ const TeacherLayout = ({ children }) => {
     },
   ];
 
+  const handleMenuClick = ({ key }) => {
+    switch (key) {
+      case 'profile':
+        navigate(`/profile/${localStorage.getItem('user_id')}`);
+        break;
+      case 'settings':
+        navigate('/settings');
+        break;
+      case 'logout':
+        // logout logic here
+        localStorage.clear();
+        navigate('/login');
+        break;
+      default:
+        break;
+    }
+  };
+
   const userMenuItems = {
+    onClick: handleMenuClick,
     items: [
       {
         key: 'profile',
@@ -78,6 +99,7 @@ const TeacherLayout = ({ children }) => {
       },
     ]
   };
+
 
   return (
     <Layout style={{ minHeight: '100vh' }}>

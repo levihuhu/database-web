@@ -20,7 +20,7 @@ import {
   ExclamationCircleOutlined,
   CodeOutlined,
 } from '@ant-design/icons';
-import apiClient from "../services/api.js";
+import apiClient from "../../services/api.js";
 
 const { Title, Paragraph, Text } = Typography;
 const { TextArea } = Input;

@@ -12,7 +12,7 @@ import {
   EditOutlined,
   DatabaseOutlined,
 } from '@ant-design/icons';
-import apiClient from "../services/api.js";
+import apiClient from "../../services/api.js";
 
 const { Title, Paragraph } = Typography;
 

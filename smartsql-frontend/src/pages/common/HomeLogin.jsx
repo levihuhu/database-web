@@ -12,8 +12,8 @@ import {
   Row,
   Col
 } from 'antd';
-import { handleError } from "../services/utils.js";
-
+import { handleError } from "../../services/utils.js";
+import { useNavigate } from 'react-router-dom';
 
 const { Title, Text } = Typography;
 const BASE_URL = import.meta.env.VITE_API_BASE_URL;
@@ -24,6 +24,7 @@ export default function HomeLogin() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [form]  = Form.useForm();
+  const navigate = useNavigate();
 
   const handleLogin = async (values) => {
     const { identifier, password, role } = values;
@@ -41,7 +42,7 @@ export default function HomeLogin() {
       const result = await res.json();
 
       if (res.ok) {
-        const { access, refresh, user_id, username } = result;
+        const { access, refresh, user_id, username,role } = result.data;
 
         localStorage.setItem('access', access);
         localStorage.setItem('refresh', refresh);
@@ -50,12 +51,12 @@ export default function HomeLogin() {
         localStorage.setItem('role', role);
 
         if (role === 'instructor') {
-          window.location.href = '/teacher';
+          navigate('/teacher');
         } else {
-          window.location.href = '/student/sql';
+          navigate('/student/sql');
         }
       } else {
-        throw new Error(result.message || 'Login failed');
+        message.error(result.message || '登录失败');
       }
     } catch (error) {
       console.error('Login error:', error);
@@ -131,7 +132,7 @@ export default function HomeLogin() {
               </Form>
 
               <Text type="secondary" style={{ fontSize: '12px', display: 'block', textAlign: 'center' }}>
-                Don’t have an account? <a href="/signup/">Sign up</a>
+                Don't have an account? <a href="/signup/">Sign up</a>
               </Text>
             </Col>
           </Row>
