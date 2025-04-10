@@ -1,16 +1,17 @@
 
 -- Users table
-INSERT INTO Users (user_id, username, email, password, user_type, profile_info) VALUES
-(1, 'John', '1001@northeastern.edu', 'passJohn', 'Student', 'John is a CS student.'),
-(2, 'Mary', '1002@northeastern.edu', 'passMary', 'Student', 'Mary is a CS student.'),
-(3, 'Peter', '1003@northeastern.edu', 'passPeter', 'Student', 'Peter is a CS student.'),
-(4, 'Linda', '1004@northeastern.edu', 'passLinda', 'Student', 'Linda is a CS student.'),
-(5, 'Robert', '1005@northeastern.edu', 'passRobert', 'Student', 'Robert is a a CS student.'),
-(6, 'Bmith', '1006@northeastern.edu', 'passSmith', 'Instructor', 'Professor Smith, PhD.'),
-(7, 'prof_jones', '1007@northeastern.edu', 'passJones', 'Instructor', 'Instructor Jones.'),
-(8, 'Williams', '1008@northeastern.edu', 'passWilliams', 'Instructor', 'Instructor of research projects.'),
-(9, 'Brown', '1009@northeastern.edu', 'passBrown', 'Instructor', 'TA in CS5200.'),
-(10, 'Emily', '1010@northeastern.edu', 'passEmily', 'Student', 'Emily is a CS student.');
+INSERT INTO Users (user_id, first_name, last_name, username, email, password, user_type, profile_info) VALUES
+(1, 'John', 'Doe', 'John', '1001@northeastern.edu', 'passJohn', 'Student', 'John is a CS student.'),
+(2, 'Mary', 'Smith', 'Mary', '1002@northeastern.edu', 'passMary', 'Student', 'Mary is a CS student.'),
+(3, 'Peter', 'Johnson', 'Peter', '1003@northeastern.edu', 'passPeter', 'Student', 'Peter is a CS student.'),
+(4, 'Linda', 'Lee', 'Linda', '1004@northeastern.edu', 'passLinda', 'Student', 'Linda is a CS student.'),
+(5, 'Robert', 'Kim', 'Robert', '1005@northeastern.edu', 'passRobert', 'Student', 'Robert is a CS student.'),
+(6, 'Smith', 'Brown', 'Bmith', '1006@northeastern.edu', 'passSmith', 'Instructor', 'Professor Smith, PhD.'),
+(7, 'James', 'Jones', 'prof_jones', '1007@northeastern.edu', 'passJones', 'Instructor', 'Instructor Jones.'),
+(8, 'William', 'Williams', 'Williams', '1008@northeastern.edu', 'passWilliams', 'Instructor', 'Instructor of research projects.'),
+(9, 'Brian', 'Brown', 'Brown', '1009@northeastern.edu', 'passBrown', 'Instructor', 'TA in CS5200.'),
+(10, 'Emily', 'Taylor', 'Emily', '1010@northeastern.edu', 'passEmily', 'Student', 'Emily is a CS student.');
+
 
 
 -- Student table (from student users)
@@ -113,53 +114,56 @@ INSERT INTO Score (score_id, student_id, course_id, total_score, `rank`) VALUES
 (11, 5, 10, 84.75, 3),
 (12, 10, 11, 90.50, 2);
 
--- Message table
-INSERT INTO Message (message_id, sender_id, receiver_id, message_content, timestamp) VALUES
-(1, 1, 6, 'Hi Professor Lee!', '2025-01-15 10:00:00'),
-(2, 2, 7, 'Dear TA, I have some questions regarding lab exercises.', '2025-01-16 11:15:00'),
-(3, 3, 8, 'Hello, can you explain further about the assignment requirements?', '2025-01-17 09:45:00'),
-(4, 4, 9, 'When is the next lab session?', '2025-01-18 14:30:00'),
-(5, 5, 6, 'Hello, how can I submit the project', '2025-01-19 08:20:00'),
-(6, 10, 7, 'sample', '2025-01-20 16:00:00'),
-(7, 1, 8, 'Thank you!', '2025-01-21 12:10:00');
 
-INSERT INTO Exercise (module_id, title, description, hint, expected_answer, difficulty, table_schema, tags, created_by)
-VALUES (
-    2,
-    'Simple SELECT Query',
-    'Write a SQL query to select all columns from the ''employees'' table.',
-    'Use SELECT * FROM employees;',
-    'SELECT * FROM employees;',
-    'Easy',
-    '[{"name": "employees", "columns": ["id", "first_name", "last_name", "department", "salary"]}]',
-    'select, basics',
-    6
-),
-(
-    1,
-    'Average Salary by Department',
-    'Write a SQL query to calculate the average salary for each department.',
-    'Use GROUP BY on the department column.',
-    'SELECT department, AVG(salary) FROM employees GROUP BY department;',
-    'Medium',
-    '[{"name": "employees", "columns": ["id", "name", "department", "salary"]}]',
-    'aggregation, group by',
-    6
-),
-(
-    3,
-    'Find Students and Their Courses',
-    'Write a SQL query to list student names along with the names of courses they are enrolled in.',
-    'Use JOIN between students, enrollments, and courses.',
-    'SELECT s.name, c.course_name 
-            FROM students s
-            JOIN enrollments e ON s.id = e.student_id
-            JOIN courses c ON e.course_id = c.id;',
-    'Medium',
-    '[{"name": "students", "columns": ["id", "name"]}, {"name": "enrollments", "columns": ["id", "student_id", "course_id"]}, {"name": "courses", "columns": ["id", "course_name"]}]',
-    'join, relational',
-    6
-);
+INSERT INTO Message (message_id, sender_id, message_type, message_content, timestamp) VALUES
+(1, 1, 'private', 'Hi Professor Lee!', '2025-01-15 10:00:00'),
+(2, 2, 'private', 'Dear TA, I have some questions regarding lab exercises.', '2025-01-16 11:15:00'),
+(3, 3, 'private', 'Hello, can you explain further about the assignment requirements?', '2025-01-17 09:45:00'),
+(4, 4, 'private', 'When is the next lab session?', '2025-01-18 14:30:00'),
+(5, 5, 'private', 'Hello, how can I submit the project?', '2025-01-19 08:20:00'),
+(6, 10, 'private', 'sample', '2025-01-20 16:00:00'),
+(7, 1, 'private', 'Thank you!', '2025-01-21 12:10:00'),
+(8, 6, 'announcement', 'Reminder: Project 1 is due this Friday.', '2025-01-22 09:00:00'),
+(9, 7, 'announcement', 'Quiz 2 will be next Monday during class.', '2025-01-23 14:30:00'),
+(10, 8, 'announcement', 'Don''t forget to submit Assignment 2 by tonight.', '2025-01-24 10:00:00'),
+(11, 9, 'announcement', 'The lecture slides have been uploaded to the portal.', '2025-01-25 11:00:00'),
+(12, 6, 'announcement', 'Office hours are extended to 6pm this week.', '2025-01-26 15:30:00'),
+(13, 7, 'announcement', 'Midterm grades are released.', '2025-01-27 13:20:00'),
+(14, 9, 'announcement', 'Class will be online tomorrow.', '2025-01-28 16:00:00');
+
+
+INSERT INTO PrivateMessage (message_id, receiver_id) VALUES
+(1, 6),
+(2, 7),
+(3, 8),
+(4, 9),
+(5, 6),
+(6, 7),
+(7, 8);
+
+
+INSERT INTO Announcement (message_id, course_id) VALUES
+(8, 1),
+(9, 3),
+(10, 4),
+(11, 5),
+(12, 2),
+(13, 6),
+(14, 15);
+
+
+INSERT INTO Exercise (exercise_id, title, description, hint, expected_answer, difficulty, table_schema, tags, created_by)
+VALUES
+(1, 'Simple SELECT Query', 'Write a SQL query to select all columns from the ''employees'' table.', 'Use SELECT * FROM employees;', 'SELECT * FROM employees;', 'Easy', '[{"name": "employees", "columns": ["id", "first_name", "last_name", "department", "salary"]}]', 'select, basics', 6),
+(2, 'Average Salary by Department', 'Write a SQL query to calculate the average salary for each department.', 'Use GROUP BY on the department column.', 'SELECT department, AVG(salary) FROM employees GROUP BY department;', 'Medium', '[{"name": "employees", "columns": ["id", "name", "department", "salary"]}]', 'aggregation, group by', 6),
+(3, 'Find Students and Their Courses', 'Write a SQL query to list student names along with the names of courses they are enrolled in.', 'Use JOIN between students, enrollments, and courses.', 'SELECT s.name, c.course_name \n        FROM students s\n        JOIN enrollments e ON s.id = e.student_id\n        JOIN courses c ON e.course_id = c.id;', 'Medium', '[{"name": "students", "columns": ["id", "name"]}, {"name": "enrollments", "columns": ["id", "student_id", "course_id"]}, {"name": "courses", "columns": ["id", "course_name"]}]', 'join, relational', 6);
+
+INSERT INTO Module_Exercise (module_id, exercise_id, display_order)
+VALUES
+(2, 1, 1),
+(1, 2, 2),
+(3, 3, 3);
+
 
 -- Question table
 INSERT INTO Question (question_id, question_text, difficulty_level, tags, created_by) VALUES
@@ -171,45 +175,6 @@ INSERT INTO Question (question_id, question_text, difficulty_level, tags, create
 (6, 'Define stored procedure and its purpose.', 'Medium', 'procedures, functions', 7),
 (7, 'How do views help in database abstraction?', 'Easy', 'views, security', 8);
 
--- Competition table
-INSERT INTO Competition (competition_id, competition_name, start_time, end_time, status, created_by) VALUES
-(201, 'Database Design Challenge', '2025-02-01 09:00:00', '2025-02-01 12:00:00', 'Completed', 6),
-(202, 'SQL Query Contest', '2025-02-05 10:00:00', '2025-02-05 13:00:00', 'Completed', 7),
-(203, 'ER Diagram Competition', '2025-02-10 09:30:00', '2025-02-10 12:30:00', 'Ongoing', 8),
-(204, 'Advanced SQL Battle', '2025-02-12 11:00:00', '2025-02-12 12:00:00', 'Completed', 9),
-(205, 'Database Optimization Sprint', '2025-02-15 10:00:00', '2025-02-15 11:30:00', 'Ongoing', 6),
-(206, 'Stored Procedure Showdown', '2025-02-18 14:00:00', '2025-02-18 16:00:00', 'Upcoming', 7),
-(207, 'Trigger and Function Face-off', '2025-02-20 13:00:00', '2025-02-20 16:00:00', 'Upcoming', 8);
-
--- Competition_Participants table
-INSERT INTO Competition_Participants (participant_id, competition_id, student_id, score, `rank`) VALUES
-(1, 201, 1, 94.00, 1),
-(2, 201, 2, 88.00, 2),
-(3, 202, 3, 92.00, 1),
-(4, 203, 4, 85.00, 2),
-(5, 204, 5, 90.00, 2),
-(6, 205, 10, 87.50, 2),
-(7, 207, 1, 93.00, 1);
-
--- Competition_Questions table
-INSERT INTO Competition_Questions (entry_id, competition_id, question_id) VALUES
-(1, 201, 1),
-(2, 202, 2),
-(3, 203, 3),
-(4, 204, 4),
-(5, 205, 5),
-(6, 206, 6),
-(7, 207, 7);
-
--- Real_Time_Activity table
-INSERT INTO Real_Time_Activity (activity_id, competition_id, student_id, question_id, timestamp, status) VALUES
-(1, 201, 1, 1, '2025-02-01 09:15:00', 'Answered'),
-(2, 202, 3, 2, '2025-02-05 10:30:00', 'Answered'),
-(3, 203, 4, 3, '2025-02-10 09:45:00', 'Pending'),
-(4, 204, 5, 4, '2025-02-12 11:15:00', 'Answered'),
-(5, 205, 10, 5, '2025-02-15 10:15:00', 'Answered'),
-(6, 206, 1, 6, '2025-02-18 14:30:00', 'Pending'),
-(7, 207, 1, 7, '2025-02-20 13:30:00', 'Answered');
 
 -- Error_Log table
 INSERT INTO Error_Log (error_id, student_id, question_id, error_type, feedback) VALUES
