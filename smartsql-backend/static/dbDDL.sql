@@ -136,6 +136,14 @@ CREATE TABLE Module_Exercise (
     FOREIGN KEY (exercise_id) REFERENCES Exercise(exercise_id) ON DELETE CASCADE
 );
 
+CREATE TABLE Student_Exercise (
+                                  id INT AUTO_INCREMENT PRIMARY KEY,
+                                  student_id INT NOT NULL,
+                                  exercise_id INT NOT NULL,
+                                  completed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                                  FOREIGN KEY (student_id) REFERENCES Student(student_id) ON DELETE CASCADE,
+                                  FOREIGN KEY (exercise_id) REFERENCES Exercise(exercise_id) ON DELETE CASCADE
+);
 
 -- Question
 CREATE TABLE Question (

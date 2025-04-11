@@ -12,7 +12,8 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 
 from pathlib import Path
 from datetime import timedelta
-
+import pymysql
+pymysql.install_as_MySQLdb()
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -86,9 +87,9 @@ DATABASES = {
         'PASSWORD': 'Arashi5Kinki2',
         'HOST': '34.94.72.145',
         'PORT': '3306',
-        'OPTIONS': {
-            'auth_plugin': 'caching_sha2_password',
-        },
+        # 'OPTIONS': {
+        #     'auth_plugin': 'caching_sha2_password',
+        # },
     }
 }
 
