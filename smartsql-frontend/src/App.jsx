@@ -13,6 +13,9 @@ import CourseManage from "./pages/instructor/CourseManage.jsx";
 import Profile from './pages/common/Profile.jsx';
 // 导入 SQLExerciseTest 组件
 import SQLExerciseTest from './pages/SQLExcerciseTest.jsx';
+import InstructorExerciseView from './pages/instructor/InstructorExerciseView.jsx';
+import StudentManagement from './pages/instructor/StudentManagement.jsx'; // Import new component
+import MessagesPage from './pages/instructor/MessagesPage'; // Adjust path as needed
 
 
 function App() {
@@ -20,23 +23,28 @@ function App() {
     <Router>
       <Routes>
         <Route path="/teacher" element={<TeacherLayout />}>
-        <Route index element={<TeacherDashboard />} />
-        <Route path="sql-exercises" element={<SQLExerciseManage />} />
-        <Route path="modules" element={<ModuleManage />} />
-        <Route path="courses" element={<CourseManage />} />
-        {/* 更多 teacher 页都加在这 */}
-      </Route>
+          <Route index element={<TeacherDashboard />} />
+          <Route path="courses" element={<CourseManage />} />
+          <Route path="courses/:courseId/modules" element={<ModuleManage />} />
+          <Route path="modules" element={<ModuleManage />} />
+          <Route path="modules/:moduleId/exercises" element={<SQLExerciseManage />} />
+          <Route path="sql-exercises" element={<SQLExerciseManage />} />
+          <Route path="exercises/:exerciseId" element={<InstructorExerciseView />} />
+          <Route path="students" element={<StudentManagement />} /> {/* Add student management route */}
+          <Route path="courses/:courseId/students" element={<StudentManagement />} /> {/* Optional: Route to filter students by course */}
+          <Route path="messages" element={<MessagesPage />} />
+        </Route>
         
         {/* Student routes */}
         <Route path="/student" element={<StudentAIChat />} />
         <Route path="/student/sql" element={<StudentSQLCamp />} />
         {/*<Route path="/student/sql/:moduleId" element={<SQLExercise />} />*/}
-        <Route path="/student/sql/:moduleId" element={<SQLExerciseTest />} />
+        {/* <Route path="/student/sql/:moduleId" element={<SQLExerciseTest />} /> */}
         <Route path="/student/sql/:moduleId/:exerciseId" element={<SQLExerciseTest />} />
         
         {/* Default redirect */}
         <Route path="/" element={<HomeLogin />} />
-        <Route path="/profile/:userId" element={<Profile />} />
+        <Route path="/profile/:userId?" element={<Profile />} />
       </Routes>
     </Router>
   );

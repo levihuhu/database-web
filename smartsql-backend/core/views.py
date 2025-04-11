@@ -65,45 +65,69 @@ def login_api(request):
 @permission_classes([IsAuthenticated])
 def profile_api(request):
     try:
-        # 从请求体获取 user_id，如果没有则使用当前用户的 ID
-        user_id = request.query_params.get('user_id')
+        requester = request.user
+        user_id_param = request.query_params.get('user_id')
 
+        target_id = user_id_param if user_id_param else requester.user_id
 
-        # 如果没有提供 user_id，使用当前登录用户的 ID
-        target_id = user_id if user_id else request.user.user_id
-        
-        # 获取用户信息
+        # Fetch basic user info
         user = Users.objects.get(user_id=target_id)
-        
-        # 判断是否是查看自己的资料
-        is_own_profile = str(request.user.user_id) == str(target_id)
-        
-        # 构建响应数据
+        is_own_profile = str(requester.user_id) == str(target_id)
+
         user_data = {
+            'user_id': user.user_id,
             'first_name': user.first_name,
             'last_name': user.last_name,
-            'user_id': user.user_id,
             'username': user.username,
             'email': user.email,
             'user_type': user.user_type,
-            'profile_info': user.profile_info
+            'profile_info': user.profile_info,
+            # Add avatar_url if you have it in Users model or fetch separately
+            'avatar_url': getattr(user, 'avatar_url', None)
         }
-        
+
+        # If instructor is viewing a student's profile, add course/grade info
+        enrollments_data = None
+        if requester.user_type == 'Instructor' and user.user_type == 'Student' and not is_own_profile:
+            try:
+                with connection.cursor() as cursor:
+                    # Join Enrollment with Course AND Score
+                    cursor.execute("""
+                        SELECT
+                            c.course_id, c.course_name, c.course_code, c.year, c.term,
+                            e.status,
+                            s.total_score as grade -- Get grade from Score table
+                        FROM Enrollment e
+                        JOIN Course c ON e.course_id = c.course_id
+                        LEFT JOIN Score s ON e.student_id = s.student_id AND e.course_id = s.course_id -- Join Score
+                        WHERE e.student_id = %s AND c.instructor_id = %s
+                        ORDER BY c.year DESC, c.term DESC
+                    """, [target_id, requester.user_id])
+                    columns = [col[0] for col in cursor.description]
+                    enrollments = [dict(zip(columns, row)) for row in cursor.fetchall()]
+
+                    term_map = {1: 'Spring', 2: 'Summer', 3: 'Fall'}
+                    for enr in enrollments:
+                         enr['term'] = term_map.get(enr['term'], 'Unknown')
+                         # Ensure grade key exists, even if null
+                         if 'grade' not in enr:
+                             enr['grade'] = None
+                    enrollments_data = enrollments
+
+            except Exception as e_inner:
+                 print(f"Error fetching enrollment/score details for student {target_id}: {e_inner}")
+                 # Don't fail the whole request, just skip enrollments/scores
+
         return Response({
             'status': 'success',
             'data': user_data,
-            'is_own_profile': is_own_profile
+            'is_own_profile': is_own_profile,
+            'enrollments': enrollments_data # Will be null if not applicable or error
         })
     except Users.DoesNotExist:
-        return Response({
-            'status': 'error', 
-            'message': '用户不存在'
-        }, status=status.HTTP_404_NOT_FOUND)
+        return Response({'status': 'error', 'message': '用户不存在'}, status=status.HTTP_404_NOT_FOUND)
     except Exception as e:
-        return Response({
-            'status': 'error', 
-            'message': str(e)
-        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response({'status': 'error', 'message': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(['PUT'])

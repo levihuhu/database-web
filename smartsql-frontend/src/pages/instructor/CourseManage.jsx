@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   Card,
   Row,
@@ -14,8 +14,11 @@ import {
   message,
   Popconfirm,
   Space,
+  Tooltip,
 } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
+import { PlusOutlined, EditOutlined, DeleteOutlined, ExclamationCircleOutlined, SearchOutlined, FilterOutlined, DatabaseOutlined, TeamOutlined } from '@ant-design/icons';
+import { Link } from 'react-router-dom';
+import { debounce } from 'lodash';
 // 你已有的 axios 实例
 import apiClient from '../../services/api';
 
@@ -34,13 +37,19 @@ export default function InstructorCourseManage() {
   const [editingCourse, setEditingCourse] = useState(null);
   const [form] = Form.useForm();
 
-  // 1. 加载课程列表 (确认后端返回结构)
-  const fetchInstructorCourses = async () => {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filters, setFilters] = useState({ term: null, state: null });
+
+  const fetchInstructorCourses = useCallback(async (currentSearch, currentFilters) => {
     try {
       setLoading(true);
-      const res = await apiClient.get('/api/instructor/courses/');
-      // 确认后端返回的数据结构，例如 { courses: [...] } 或直接 [...]
-      const coursesData = res.data?.courses || res.data || []; 
+      const params = {};
+      if (currentSearch) params.search = currentSearch;
+      if (currentFilters.term) params.term = currentFilters.term;
+      if (currentFilters.state) params.state = currentFilters.state;
+
+      const res = await apiClient.get('/api/instructor/courses/', { params });
+      const coursesData = res.data?.courses || res.data || [];
       setCourses(coursesData);
     } catch (err) {
       console.error('Failed to fetch courses:', err);
@@ -49,12 +58,30 @@ export default function InstructorCourseManage() {
     } finally {
       setLoading(false);
     }
+  }, []);
+
+  // Debounced search handler
+  const debouncedSearch = useCallback(
+    debounce((value) => {
+      setSearchTerm(value);
+      fetchInstructorCourses(value, filters);
+    }, 300), // 300ms delay
+    [fetchInstructorCourses, filters] // Dependencies for useCallback
+  );
+
+  const handleSearchChange = (e) => {
+    debouncedSearch(e.target.value);
   };
 
-  // useEffect 中调用 fetchInstructorCourses
+  const handleFilterChange = (changedFilters) => {
+    const newFilters = { ...filters, ...changedFilters };
+    setFilters(newFilters);
+    fetchInstructorCourses(searchTerm, newFilters);
+  };
+
   useEffect(() => {
-    fetchInstructorCourses();
-  }, []);
+    fetchInstructorCourses(searchTerm, filters);
+  }, [fetchInstructorCourses]); // Fetch on initial mount
 
   // 2. "Add Course" 按钮
   const handleAddCourse = () => {
@@ -89,7 +116,7 @@ export default function InstructorCourseManage() {
       setLoading(true); // 开始加载状态
       await apiClient.delete(`/api/instructor/courses/delete/?course_id=${course.course_id}`);
       message.success('Course deleted successfully');
-      await fetchInstructorCourses(); // 重新获取最新课程列表
+      await fetchInstructorCourses(searchTerm, filters); // 重新获取最新课程列表
     } catch (error) {
       console.error('Failed to delete course:', error);
       message.error('Failed to delete course: ' + (error.response?.data?.detail || error.message));
@@ -114,7 +141,7 @@ export default function InstructorCourseManage() {
         }
         setModalVisible(false);
         form.resetFields();
-        await fetchInstructorCourses();
+        await fetchInstructorCourses(searchTerm, filters);
       } catch (error) {
         console.error('Failed to save course:', error);
         message.error('Failed to save course: ' + (error.response?.data?.detail || error.message));
@@ -133,82 +160,120 @@ export default function InstructorCourseManage() {
   return (
     <div style={{ padding: '24px' }}>
       <Title level={3}>My Courses</Title>
-      <Button
-        type="primary"
-        icon={<PlusOutlined />}
-        style={{ marginBottom: 16 }}
-        onClick={handleAddCourse}
-      >
-        Add Course
-      </Button>
+
+      {/* Toolbar: Add Button, Search, Filters */}
+      <Row justify="space-between" align="middle" style={{ marginBottom: 16 }}>
+        <Col>
+          <Button type="primary" icon={<PlusOutlined />} onClick={handleAddCourse}>
+            Add Course
+          </Button>
+        </Col>
+        <Col>
+          <Space>
+            <Input
+              placeholder="Search Courses..."
+              prefix={<SearchOutlined />}
+              onChange={handleSearchChange}
+              style={{ width: 200 }}
+              allowClear
+            />
+            <Select
+              placeholder="Filter by Term"
+              allowClear
+              style={{ width: 120 }}
+              onChange={(value) => handleFilterChange({ term: value })}
+            >
+              <Option value="Spring">Spring</Option>
+              <Option value="Summer">Summer</Option>
+              <Option value="Fall">Fall</Option>
+            </Select>
+            <Select
+              placeholder="Filter by State"
+              allowClear
+              style={{ width: 120 }}
+              onChange={(value) => handleFilterChange({ state: value })}
+            >
+              <Option value="active">Active</Option>
+              <Option value="completed">Completed</Option>
+              <Option value="archived">Archived</Option>
+            </Select>
+          </Space>
+        </Col>
+      </Row>
 
       {loading ? (
         <Spin size="large" />
       ) : courses.length === 0 ? (
         <Empty description="No courses found." />
       ) : (
-       <Row gutter={[16, 16]}>
-        {courses.map((course) => (
-          <Col xs={24} sm={12} md={12} lg={12} key={course.course_id}>
-            <Card
-              title={
-                <div style={{ color: '#096dd9', fontWeight: 600 }}>
-                  {course.course_name}
-                </div>
-              }
-              bordered={false}
-              style={{
-                borderRadius: '10px',
-                boxShadow: '0 4px 4px 4px rgba(0, 0, 0, 0.06)',
-                minHeight: '240px',
-              }}
-              actions={[
-                <Button
-                  icon={<EditOutlined />}
-                  size="small"
-                  onClick={() => handleEditCourse(course)}
-                >
-                  Edit
-                </Button>,
-                <Popconfirm
-                  title="Are you sure to delete this course?"
-                  icon={<ExclamationCircleOutlined style={{ color: 'red' }} />}
-                  onConfirm={() => handleDeleteCourse(course)}
-                  okText="Yes"
-                  cancelText="No"
-                >
-                  <Button icon={<DeleteOutlined />} size="small" danger>
-                    Delete
-                  </Button>
-                </Popconfirm>,
-              ]}
-            >
-              <Row gutter={[8, 6]}>
-                <Col span={12}>
-                  <Text type="secondary">Code: {course.course_code}</Text>
-                </Col>
-                <Col span={12}>
-                  <Text>Year: {course.year}</Text>
-                </Col>
+        <Row gutter={[16, 16]}>
+          {courses.map((course) => (
+            <Col xs={24} sm={12} md={8} lg={8} key={course.course_id}>
+              <Card
+                title={
+                  <div style={{ color: '#096dd9', fontWeight: 600 }}>
+                    {course.course_name}
+                  </div>
+                }
+                bordered={false}
+                style={{
+                  borderRadius: '10px',
+                  boxShadow: '0 4px 4px 4px rgba(0, 0, 0, 0.06)',
+                  minHeight: '300px',
+                }}
+                actions={[
+                  <Tooltip title="View Modules">
+                    <Link to={`/teacher/courses/${course.course_id}/modules`}>
+                      <Button size="small" icon={<DatabaseOutlined />} />
+                    </Link>
+                  </Tooltip>,
+                  <Tooltip title="View Students">
+                    <Link to={`/teacher/courses/${course.course_id}/students`}>
+                      <Button size="small" icon={<TeamOutlined />} />
+                    </Link>
+                  </Tooltip>,
+                  <Tooltip title="Edit Course">
+                    <Button icon={<EditOutlined />} size="small" onClick={() => handleEditCourse(course)} />
+                  </Tooltip>,
+                  <Popconfirm
+                    title="Are you sure to delete this course?"
+                    icon={<ExclamationCircleOutlined style={{ color: 'red' }} />}
+                    onConfirm={() => handleDeleteCourse(course)}
+                    okText="Yes"
+                    cancelText="No"
+                  >
+                    <Tooltip title="Delete Course">
+                      <Button icon={<DeleteOutlined />} size="small" danger />
+                    </Tooltip>
+                  </Popconfirm>,
+                ]}
+              >
+                <Row gutter={[8, 6]} style={{ minHeight: '160px' }}>
+                  <Col span={12}>
+                    <Text type="secondary">Code: {course.course_code}</Text>
+                  </Col>
+                  <Col span={12}>
+                    <Text>Year: {course.year}</Text>
+                  </Col>
 
-                <Col span={12}>
-                  <Text>Term: {course.term}</Text>
-                </Col>
-                <Col span={12}>
-                  <Text>Status: {course.state}</Text>
-                </Col>
+                  <Col span={12}>
+                    <Text>Term: {course.term}</Text>
+                  </Col>
+                  <Col span={12}>
+                    <Text>Status: {course.state}</Text>
+                  </Col>
 
-                <Col span={12}>
-                  <Text>Enrolled: {course.enrolled_students}</Text>
-                </Col>
-                <Col span={24}>
-                  <Text type="secondary">{course.course_description}</Text>
-                </Col>
-              </Row>
-      </Card>
-    </Col>
-  ))}
-</Row>
+                  <Col span={12}>
+                    <Text>Enrolled: {course.enrolled_students}</Text>
+                  </Col>
+                  <Col span={24}>
+                    <Text type="secondary">{course.course_description}</Text>
+                  </Col>
+                </Row>
+              </Card>
+            </Col>
+          ))}
+        </Row>
       )}
 
       {/* 添加/编辑 Modal */}
