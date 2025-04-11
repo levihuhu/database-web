@@ -226,3 +226,394 @@ def messages_api(request):
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+@api_view(['POST'])
+@authentication_classes([CustomJWTAuthentication])
+@permission_classes([IsAuthenticated])
+def dynamic_sql_query_api(request):
+    try:
+        # 获取请求参数
+        table_name = request.data.get('table_name')
+        columns = request.data.get('columns', [])
+        conditions = request.data.get('conditions', [])
+        order_by = request.data.get('order_by', [])
+        limit = request.data.get('limit')
+        offset = request.data.get('offset')
+
+        # 构建基础SQL查询
+        base_query = "SELECT "
+        
+        # 添加列
+        if columns:
+            base_query += ", ".join(columns)
+        else:
+            base_query += "*"
+            
+        base_query += f" FROM {table_name}"
+        
+        # 添加条件
+        if conditions:
+            base_query += " WHERE " + " AND ".join(conditions)
+            
+        # 添加排序
+        if order_by:
+            base_query += " ORDER BY " + ", ".join(order_by)
+            
+        # 添加分页
+        if limit is not None:
+            base_query += f" LIMIT {limit}"
+            if offset is not None:
+                base_query += f" OFFSET {offset}"
+                
+        # 执行查询
+        with connection.cursor() as cursor:
+            cursor.execute(base_query)
+            columns = [col[0] for col in cursor.description]
+            results = [dict(zip(columns, row)) for row in cursor.fetchall()]
+            
+        return Response({
+            'status': 'success',
+            'data': results,
+            'query': base_query
+        }, status=status.HTTP_200_OK)
+            
+    except Exception as e:
+        return Response({
+            'status': 'error',
+            'message': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET'])
+@authentication_classes([CustomJWTAuthentication])
+@permission_classes([IsAuthenticated])
+def student_courses_api(request):
+    try:
+        # ✅ 获取当前登录用户的 student_id
+        student_id = request.user.user_id
+        print("✅ 当前用户 ID：", student_id)
+
+        # ✅ 查询该学生已enroll的课程，并附带相关信息
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT 
+                    c.course_id,
+                    c.course_name,
+                    c.course_code,
+                    c.course_description,
+                    c.year,
+                    c.term,
+                    c.state,
+                    s.total_score,
+                    s.rank,
+                    (SELECT COUNT(*) 
+                     FROM Module m 
+                     WHERE m.course_id = c.course_id) AS total_modules,
+                    (SELECT COUNT(*) 
+                     FROM Module_Exercise me
+                     JOIN Module m ON me.module_id = m.module_id
+                     WHERE m.course_id = c.course_id) AS total_exercises
+                FROM Course c
+                JOIN Enrollment e ON c.course_id = e.course_id
+                LEFT JOIN Score s ON c.course_id = s.course_id AND s.student_id = %s
+                WHERE e.student_id = %s AND e.status = 'enrolled'
+                ORDER BY c.year DESC, c.term DESC
+            """, [student_id, student_id])
+
+            # 转换为 dict 列表返回
+            columns = [col[0] for col in cursor.description]
+            results = [dict(zip(columns, row)) for row in cursor.fetchall()]
+
+        return Response({
+            "status": "success",
+            "data": results
+        }, status=status.HTTP_200_OK)
+
+    except Exception as e:
+        print("❌ 查询出错：", str(e))
+        return Response({
+            "status": "error",
+            "message": str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['GET'])
+@authentication_classes([CustomJWTAuthentication])
+@permission_classes([IsAuthenticated])
+def course_modules_api(request, course_id):
+    try:
+        # 获取当前登录的学生ID
+        student_id = request.user.user_id
+        
+        # 验证学生是否注册了该课程
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT 1 FROM Enrollment 
+                WHERE student_id = %s AND course_id = %s AND status = 'enrolled'
+            """, [student_id, course_id])
+            
+            if not cursor.fetchone():
+                return Response({
+                    'status': 'error',
+                    'message': '您未注册此课程'
+                }, status=status.HTTP_403_FORBIDDEN)
+                
+            # 获取课程信息
+            cursor.execute("""
+                SELECT 
+                    c.course_id,
+                    c.course_name,
+                    c.course_code,
+                    c.course_description,
+                    c.year,
+                    c.term,
+                    c.state,
+                    s.total_score,
+                    s.rank
+                FROM Course c
+                LEFT JOIN Score s ON c.course_id = s.course_id AND s.student_id = %s
+                WHERE c.course_id = %s
+            """, [student_id, course_id])
+            
+            columns = [col[0] for col in cursor.description]
+            course = dict(zip(columns, cursor.fetchone()))
+            
+            # 获取模块信息
+            cursor.execute("""
+                SELECT 
+                    m.module_id,
+                    m.module_name,
+                    m.module_description,
+                    COUNT(me.exercise_id) as total_exercises,
+                    (SELECT COUNT(*) 
+                     FROM Module_Exercise me2 
+                     JOIN Exercise e ON me2.exercise_id = e.exercise_id
+                     WHERE me2.module_id = m.module_id) as completed_exercises,
+                    CASE 
+                        WHEN m.module_id = 1 THEN 0
+                        WHEN EXISTS (
+                            SELECT 1 
+                            FROM Module m2 
+                            JOIN Module_Exercise me2 ON m2.module_id = me2.module_id
+                            WHERE m2.course_id = m.course_id 
+                            AND m2.module_id < m.module_id
+                            AND me2.exercise_id NOT IN (
+                                SELECT exercise_id 
+                                FROM Module_Exercise me3
+                                WHERE me3.module_id = m2.module_id
+                            )
+                        ) THEN 1
+                        ELSE 0
+                    END as locked
+                FROM Module m
+                LEFT JOIN Module_Exercise me ON m.module_id = me.module_id
+                WHERE m.course_id = %s
+                GROUP BY m.module_id, m.module_name, m.module_description
+                ORDER BY m.module_id
+            """, [course_id])
+            
+            columns = [col[0] for col in cursor.description]
+            modules = [dict(zip(columns, row)) for row in cursor.fetchall()]
+            
+        return Response({
+            'status': 'success',
+            'data': {
+                'course': course,
+                'modules': modules
+            }
+        }, status=status.HTTP_200_OK)
+            
+    except Exception as e:
+        return Response({
+            'status': 'error',
+            'message': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['POST'])
+@authentication_classes([CustomJWTAuthentication])
+@permission_classes([IsAuthenticated])
+def accept_all_courses_api(request):
+    try:
+        # 获取当前登录的学生ID
+        student_id = request.user.user_id
+        
+        # 获取所有可用的课程
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT c.course_id
+                FROM Course c
+                WHERE c.state = 'active'
+                AND c.course_id NOT IN (
+                    SELECT course_id 
+                    FROM Enrollment 
+                    WHERE student_id = %s AND status = 'enrolled'
+                )
+            """, [student_id])
+            
+            available_courses = [row[0] for row in cursor.fetchall()]
+            
+            # 为每个可用课程创建注册记录
+            for course_id in available_courses:
+                cursor.execute("""
+                    INSERT INTO Enrollment (student_id, course_id, status)
+                    VALUES (%s, %s, 'enrolled')
+                """, [student_id, course_id])
+                
+        return Response({
+            'status': 'success',
+            'message': f'成功注册了 {len(available_courses)} 门课程'
+        }, status=status.HTTP_200_OK)
+            
+    except Exception as e:
+        return Response({
+            'status': 'error',
+            'message': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['GET'])
+@authentication_classes([CustomJWTAuthentication])
+@permission_classes([IsAuthenticated])
+def module_exercises_api(request, course_id, module_id):
+    try:
+        # 获取当前登录的学生ID
+        student_id = request.user.user_id
+        
+        # 验证学生是否注册了该课程
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT 1 FROM Enrollment 
+                WHERE student_id = %s AND course_id = %s AND status = 'enrolled'
+            """, [student_id, course_id])
+            
+            if not cursor.fetchone():
+                return Response({
+                    'status': 'error',
+                    'message': '您未注册此课程'
+                }, status=status.HTTP_403_FORBIDDEN)
+                
+            # 获取模块信息
+            cursor.execute("""
+                SELECT 
+                    m.module_id,
+                    m.module_name,
+                    m.module_description,
+                    c.course_name,
+                    c.course_code
+                FROM Module m
+                JOIN Course c ON m.course_id = c.course_id
+                WHERE m.module_id = %s AND m.course_id = %s
+            """, [module_id, course_id])
+            
+            columns = [col[0] for col in cursor.description]
+            module = dict(zip(columns, cursor.fetchone()))
+            
+            # 获取练习信息
+            cursor.execute("""
+                SELECT 
+                    e.exercise_id,
+                    e.title,
+                    e.description,
+                    e.hint,
+                    e.difficulty,
+                    e.table_schema,
+                    CASE 
+                        WHEN se.student_id IS NOT NULL THEN 1
+                        ELSE 0
+                    END as completed
+                FROM Exercise e
+                JOIN Module_Exercise me ON e.exercise_id = me.exercise_id
+                LEFT JOIN Student_Exercise se ON e.exercise_id = se.exercise_id AND se.student_id = %s
+                WHERE me.module_id = %s
+                ORDER BY e.exercise_id
+            """, [student_id, module_id])
+            
+            columns = [col[0] for col in cursor.description]
+            exercises = [dict(zip(columns, row)) for row in cursor.fetchall()]
+            
+        return Response({
+            'status': 'success',
+            'data': {
+                'module': module,
+                'exercises': exercises
+            }
+        }, status=status.HTTP_200_OK)
+            
+    except Exception as e:
+        return Response({
+            'status': 'error',
+            'message': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['POST'])
+@authentication_classes([CustomJWTAuthentication])
+@permission_classes([IsAuthenticated])
+def submit_exercise_api(request, course_id, module_id, exercise_id):
+    try:
+        # 获取当前登录的学生ID
+        student_id = request.user.user_id
+        
+        # 验证学生是否注册了该课程
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT 1 FROM Enrollment 
+                WHERE student_id = %s AND course_id = %s AND status = 'enrolled'
+            """, [student_id, course_id])
+            
+            if not cursor.fetchone():
+                return Response({
+                    'status': 'error',
+                    'message': '您未注册此课程'
+                }, status=status.HTTP_403_FORBIDDEN)
+                
+            # 验证练习是否属于该模块
+            cursor.execute("""
+                SELECT 1 FROM Module_Exercise
+                WHERE module_id = %s AND exercise_id = %s
+            """, [module_id, exercise_id])
+            
+            if not cursor.fetchone():
+                return Response({
+                    'status': 'error',
+                    'message': '练习不存在或不属于该模块'
+                }, status=status.HTTP_404_NOT_FOUND)
+                
+            # 获取练习的预期答案
+            cursor.execute("""
+                SELECT expected_answer FROM Exercise
+                WHERE exercise_id = %s
+            """, [exercise_id])
+            
+            expected_answer = cursor.fetchone()[0]
+            
+            # 获取学生提交的答案
+            student_answer = request.data.get('answer')
+            
+            if not student_answer:
+                return Response({
+                    'status': 'error',
+                    'message': '请提交答案'
+                }, status=status.HTTP_400_BAD_REQUEST)
+                
+            # 记录学生练习完成情况
+            cursor.execute("""
+                INSERT INTO Student_Exercise (student_id, exercise_id)
+                VALUES (%s, %s)
+                ON DUPLICATE KEY UPDATE completed_at = CURRENT_TIMESTAMP
+            """, [student_id, exercise_id])
+            
+            # 检查答案是否正确
+            is_correct = student_answer.strip().lower() == expected_answer.strip().lower()
+            
+        return Response({
+            'status': 'success',
+            'data': {
+                'is_correct': is_correct,
+                'message': '答案已提交'
+            }
+        }, status=status.HTTP_200_OK)
+            
+    except Exception as e:
+        return Response({
+            'status': 'error',
+            'message': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+

@@ -22,4 +22,18 @@ apiClient.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
+// 提交练习
+export const submitExercise = async (courseId, moduleId, exerciseId, answer) => {
+  try {
+    const response = await axios.post(
+      `${API_URL}/api/student/courses/${courseId}/modules/${moduleId}/exercises/${exerciseId}/submit/`,
+      { answer },
+      { headers: { Authorization: `Bearer ${localStorage.getItem('access')}` } }
+    );
+    return response.data;
+  } catch (error) {
+    throw error.response?.data || { message: '提交练习失败' };
+  }
+};
+
 export default apiClient;

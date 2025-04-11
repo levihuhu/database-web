@@ -165,6 +165,7 @@ VALUES
 (3, 3, 3);
 
 
+
 -- Question table
 INSERT INTO Question (question_id, question_text, difficulty_level, tags, created_by) VALUES
 (1, 'What is normalization in database design?', 'Medium', 'database, normalization', 6),

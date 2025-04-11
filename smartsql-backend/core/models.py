@@ -46,3 +46,17 @@ class Instructor(models.Model):
         db_table = 'Instructor'
         managed = False
 
+
+class Student_Exercise(models.Model):
+    student_id = models.IntegerField()
+    exercise_id = models.IntegerField()
+    completed_at = models.DateTimeField(auto_now_add=True)
+    score = models.FloatField(default=0.0)
+    submission_count = models.IntegerField(default=0)
+    last_submission = models.TextField(null=True, blank=True)
+    is_correct = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = 'Student_Exercise'
+        unique_together = ('student_id', 'exercise_id')
+
