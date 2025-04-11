@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Avatar, Typography, Button, Form, Input, Radio, Tabs, message, Modal, Row, Col, Divider, Statistic } from 'antd';
+import { Card, Avatar, Typography, Button, Form, Input, Radio, Tabs, message, Modal, Row, Col, Divider, Statistic, List } from 'antd';
 import { UserOutlined, EditOutlined, MailOutlined, SaveOutlined, CloseOutlined, EnvironmentOutlined, TeamOutlined } from '@ant-design/icons';
-import { useParams } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import apiClient from '../../services/api';
 
 const { Title, Text, Paragraph } = Typography;
@@ -15,6 +15,7 @@ export default function Profile() {
   const [messageModal, setMessageModal] = useState(false);
   const [messageContent, setMessageContent] = useState('');
   const [form] = Form.useForm();
+  const [enrollments, setEnrollments] = useState(null); // Add state for enrollments
   
   // 获取当前登录用户ID
   const currentUserId = localStorage.getItem('user_id');
@@ -26,6 +27,7 @@ export default function Profile() {
   
   const fetchUserData = async () => {
     setLoading(true);
+    setEnrollments(null); // Reset enrollments on fetch
     try {
       const targetId = userId || currentUserId;
       const response = await apiClient.get(`/api/users/profile/?user_id=${targetId}`);
@@ -41,6 +43,12 @@ export default function Profile() {
           user_type: userData.user_type,
           profile_info: userData.profile_info
         });
+
+        // Check if enrollment data is present (added by backend for instructor view)
+        if (response.data.enrollments) {
+          setEnrollments(response.data.enrollments);
+        }
+
       } else {
         message.error(response.data.message || '获取用户数据失败');
       }
@@ -248,6 +256,34 @@ export default function Profile() {
                 </Col>
               </Row>
             </div>
+
+            {/* Display Enrollments if available (viewed by instructor) */}
+            {enrollments && enrollments.length > 0 && (
+              <>
+                <Divider />
+                <Title level={4}>Course Enrollments (Your Courses)</Title>
+                <List
+                  itemLayout="horizontal"
+                  dataSource={enrollments}
+                  renderItem={item => (
+                    <List.Item>
+                      <List.Item.Meta
+                        title={<Link to={`/teacher/courses/${item.course_id}/modules`}>{item.course_name} ({item.course_code})</Link>}
+                        description={`${item.year} ${item.term} - Status: ${item.status}`}
+                      />
+                      <div>Grade: {item.grade || 'N/A'}</div>
+                    </List.Item>
+                  )}
+                />
+              </>
+            )}
+            
+            {enrollments && enrollments.length === 0 && (
+              <>
+                <Divider />
+                <Text type="secondary">No enrollment records found for this student in your courses.</Text>
+              </>
+            )}
           </>
         )}
       </Card>

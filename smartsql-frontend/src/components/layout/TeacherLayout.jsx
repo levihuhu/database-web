@@ -119,7 +119,7 @@ const TeacherLayout = ({ children }) => {
         }}
       >
         <div style={{ height: 64, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <Title level={4} style={{ margin: 0, color: '#1890ff' }}>
+          <Title level={4} style={{ margin: 0, color: '#1890ff', cursor: 'pointer' }} onClick={() => navigate('/teacher') }>
             {collapsed ? 'SMS' : 'Management System'}
           </Title>
         </div>
