@@ -165,18 +165,6 @@ VALUES
 (3, 3, 3);
 
 
-
--- Question table
-INSERT INTO Question (question_id, question_text, difficulty_level, tags, created_by) VALUES
-(1, 'What is normalization in database design?', 'Medium', 'database, normalization', 6),
-(2, 'How does ACID property work?', 'Hard', 'transactions, ACID', 7),
-(3, 'Explain the use of foreign keys.', 'Easy', 'keys, constraints', 8),
-(4, 'Describe indexing and its benefits.', 'Medium', 'indexing, performance', 9),
-(5, 'What is a trigger and how is it used?', 'Hard', 'triggers, procedures', 6),
-(6, 'Define stored procedure and its purpose.', 'Medium', 'procedures, functions', 7),
-(7, 'How do views help in database abstraction?', 'Easy', 'views, security', 8);
-
-
 -- Error_Log table
 INSERT INTO Error_Log (error_id, student_id, question_id, error_type, feedback) VALUES
 (1, 1, 1, 'Syntax', 'Missing semicolon in query.'),
