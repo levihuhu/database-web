@@ -1,0 +1,32 @@
+name: Deploy Vite to GCS
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Node
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+
+      - name: Install deps & build
+        run: |
+          cd smartsql-frontend
+          npm ci
+          npm run build
+
+      - name: Upload to GCS
+        uses: google-github-actions/upload-cloud-storage@v1
+        with:
+          path: smartsql-frontend/dist/
+          destination: smartsql-vite-react
+        env:
+          GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ secrets.GCP_SA_KEY }}
