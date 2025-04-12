@@ -50,6 +50,7 @@ INSTALLED_APPS = [
     'instructor',
     'rest_framework',
     'corsheaders',
+    'student',
 ]
 
 MIDDLEWARE = [
@@ -168,3 +169,6 @@ SIMPLE_JWT = {
 # --- Get OpenAI API Key ---
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 # --- End Get OpenAI API Key ---
+
+# AI Settings
+DB_SCHEMA_DESCRIPTION = os.getenv('DB_SCHEMA_DESCRIPTION', '数据库 Schema 描述未配置。') # Load the description

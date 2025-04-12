@@ -30,6 +30,7 @@ urlpatterns = [
     # --- Add URL for score update ---
     path('api/instructor/scores/update/', views.instructor_update_score, name='instructor_update_score'),
 
-    # Add URL for messages view (to be created later)
-    # path('api/instructor/messages/', views.instructor_messages, name='instructor_messages'),
+    # --- Messaging ---
+    path('api/instructor/messages/', views.instructor_messages_api, name='instructor_messages'), # GET received messages, POST new message/announcement
+    path('api/instructor/recipients/', views.instructor_recipient_list_api, name='instructor_recipient_list'), # GET students and courses for sending messages
 ]

@@ -137,19 +137,16 @@ CREATE TABLE Module_Exercise (
 );
 
 
--- Error_Log
-CREATE TABLE Error_Log (
-    error_id INT PRIMARY KEY,
-    student_id INT NOT NULL,
-    question_id INT NOT NULL,
-    error_type ENUM('Syntax', 'Runtime', 'Logic'),
-    feedback TEXT,
-    FOREIGN KEY (student_id)
-        REFERENCES Student (student_id),
-    FOREIGN KEY (question_id)
-        REFERENCES Question (question_id)
+CREATE TABLE Student_Exercise (
+	id INT AUTO_INCREMENT PRIMARY KEY,
+	student_id INT NOT NULL,
+	exercise_id INT NOT NULL,
+	submitted_answer TEXT,
+	is_correct BOOLEAN,
+	completed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+	FOREIGN KEY (student_id) REFERENCES Student(student_id) ON DELETE CASCADE,
+	FOREIGN KEY (exercise_id) REFERENCES Exercise(exercise_id) ON DELETE CASCADE
 );
-
 -- Knowledge_Graph
 CREATE TABLE Knowledge_Graph (
     graph_id INT PRIMARY KEY,

@@ -4,6 +4,7 @@ import { Layout, Menu, Avatar, Dropdown, Space, Typography } from 'antd';
 import {
   UserOutlined,
   DashboardOutlined,
+  MessageOutlined,
   TeamOutlined,
   BookOutlined,
   BarChartOutlined,
@@ -11,15 +12,15 @@ import {
   LogoutOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
-  DatabaseOutlined, OrderedListOutlined
+  DatabaseOutlined,
+  OrderedListOutlined
 } from '@ant-design/icons';
-
+import InstructorAIChatbot from '../InstructorAIChatbot';
 
 const { Header, Sider, Content } = Layout;
 const { Title, Text } = Typography;
 
-
-const TeacherLayout = ({ children }) => {
+const TeacherLayout = () => {
   const [collapsed, setCollapsed] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
@@ -27,47 +28,43 @@ const TeacherLayout = ({ children }) => {
 
   const menuItems = [
     {
+      key: `${teacherPrefix}`,
+      icon: <DashboardOutlined />,
+      label: <Link to={`${teacherPrefix}`}>Dashboard</Link>,
+    },
+    {
       key: `${teacherPrefix}/courses`,
       icon: <BookOutlined />,
-      label: <Link to={`${teacherPrefix}/courses`}>Course Management</Link>,
+      label: <Link to={`${teacherPrefix}/courses`}>My Courses</Link>,
     },
     {
       key: `${teacherPrefix}/modules`,
       icon: <OrderedListOutlined />,
-      label: <Link to={`${teacherPrefix}/modules`}>Module Management</Link>,
+      label: <Link to={`${teacherPrefix}/modules`}>Modules</Link>,
     },
     {
       key: `${teacherPrefix}/sql-exercises`,
       icon: <DatabaseOutlined />,
-      label: <Link to={`${teacherPrefix}/sql-exercises`}>Exercises Management</Link>,
+      label: <Link to={`${teacherPrefix}/sql-exercises`}>Exercises</Link>,
     },
     {
       key: `${teacherPrefix}/students`,
       icon: <TeamOutlined />,
-      label: <Link to={`${teacherPrefix}/students`}>Student Management</Link>,
+      label: <Link to={`${teacherPrefix}/students`}>Students</Link>,
     },
     {
-      key: `${teacherPrefix}/grades`,
-      icon: <BarChartOutlined />,
-      label: <Link to={`${teacherPrefix}/grades`}>Grade Management</Link>,
-    },
-    {
-      key: '/settings', //
-      icon: <SettingOutlined />,
-      label: <Link to="/settings">System Settings</Link>,
+      key: `${teacherPrefix}/messages`,
+      icon: <MessageOutlined />,
+      label: <Link to={`${teacherPrefix}/messages`}>Messages</Link>,
     },
   ];
 
   const handleMenuClick = ({ key }) => {
     switch (key) {
       case 'profile':
-        navigate(`/profile/${localStorage.getItem('user_id')}`);
-        break;
-      case 'settings':
-        navigate('/settings');
+        navigate(`/profile/`);
         break;
       case 'logout':
-        // logout logic here
         localStorage.clear();
         navigate('/login');
         break;
@@ -85,11 +82,6 @@ const TeacherLayout = ({ children }) => {
         label: 'Profile',
       },
       {
-        key: 'settings',
-        icon: <SettingOutlined />,
-        label: 'Account Settings',
-      },
-      {
         type: 'divider',
       },
       {
@@ -99,7 +91,6 @@ const TeacherLayout = ({ children }) => {
       },
     ]
   };
-
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
@@ -153,7 +144,7 @@ const TeacherLayout = ({ children }) => {
             <Dropdown menu={userMenuItems} placement="bottomRight">
               <Space style={{ cursor: 'pointer' }}>
                 <Avatar icon={<UserOutlined />} />
-                <Text>Mr. Smith</Text>
+                <Text>{localStorage.getItem('username')}</Text>
               </Space>
             </Dropdown>
           </div>
@@ -162,13 +153,15 @@ const TeacherLayout = ({ children }) => {
           style={{
             margin: '24px 16px',
             padding: 24,
-            background: '#fff',
-            minHeight: 280,
-            borderRadius: 4
+            background: '#f0f2f5',
+            minHeight: `calc(100vh - 64px - 48px)`,
+            borderRadius: 4,
+            position: 'relative'
           }}
         >
           <Outlet />
         </Content>
+        <InstructorAIChatbot />
       </Layout>
     </Layout>
   );

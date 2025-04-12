@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { Typography, Table, Spin, Empty, Input, Select, Button, Space, Tag, message,Tooltip,Row,Col, Modal, InputNumber } from 'antd';
+import { Typography, Table, Spin, Empty, Input, Select, Button, Space, Tag, message,Tooltip,Row,Col, Modal, InputNumber, Form } from 'antd';
 import { UserOutlined, SearchOutlined, EyeOutlined, EditOutlined } from '@ant-design/icons';
 import apiClient from '../../services/api';
 import { debounce } from 'lodash';
@@ -9,41 +9,54 @@ const { Title, Text, Paragraph } = Typography;
 const { Option } = Select;
 
 const StudentManagement = () => {
-    const { courseId } = useParams(); // Optional: Get courseId from URL if filtering by course
+    const { courseId: paramCourseId } = useParams(); // Get courseId from URL params
     const navigate = useNavigate();
     const [students, setStudents] = useState([]);
     const [courses, setCourses] = useState([]); // For filter dropdown
     const [loading, setLoading] = useState(true);
-    const [searchTerm, setSearchTerm] = useState('');
-    const [filters, setFilters] = useState({
-        courseId: courseId || null, // Pre-fill if courseId in URL
-        status: null,
-    });
-    const [editingScoreInfo, setEditingScoreInfo] = useState(null); // { student_id, course_id, current_grade }
-    const [gradeModalVisible, setGradeModalVisible] = useState(false);
-    const [newGrade, setNewGrade] = useState(null);
+    const [searchText, setSearchText] = useState('');
+    const [filterCourseId, setFilterCourseId] = useState(paramCourseId || 'all'); // Default to URL param or 'all'
+    const [filterStatus, setFilterStatus] = useState('all');
+    const [editingRecord, setEditingRecord] = useState(null);
+    const [isModalVisible, setIsModalVisible] = useState(false);
+    const [form] = Form.useForm();
 
     // Fetch courses for the filter dropdown
-    const fetchCoursesForFilter = async () => {
+    const fetchCourses = useCallback(async () => {
         try {
             const res = await apiClient.get('/api/instructor/courses/');
             setCourses(res.data?.courses || []);
         } catch (error) {
             console.error('Error loading courses for filter:', error);
         }
-    };
+    }, []);
 
     // Fetch students based on filters
-    const fetchStudents = useCallback(async (currentSearch, currentFilters) => {
+    const fetchStudents = useCallback(async (search = '', courseId = 'all', status = 'all') => {
         setLoading(true);
         try {
-            const params = {};
-            if (currentFilters.courseId) params.course_id = currentFilters.courseId;
-            if (currentFilters.status) params.status = currentFilters.status;
-            if (currentSearch) params.search = currentSearch;
+            const params = new URLSearchParams();
+            if (search) params.append('search', search);
+            if (courseId !== 'all') params.append('course_id', courseId);
+            if (status !== 'all') params.append('status', status);
 
-            const res = await apiClient.get('/api/instructor/students/', { params });
-            setStudents(res.data?.students || []);
+            const url = `/api/instructor/students/?${params.toString()}`;
+            console.log("Fetching students from:", url); // Log the URL with params
+            const res = await apiClient.get(url);
+            
+            // Log the raw response data here!
+            console.log("Raw API response data for students:", res.data);
+
+            if (res.data && res.data.students) {
+                const studentsWithKeys = res.data.students.map(student => ({
+                    ...student,
+                    key: student.user_id // Use user_id as the unique key
+                }));
+                setStudents(studentsWithKeys);
+            } else {
+                setStudents([]); // Clear students if response format is unexpected
+                console.error("Unexpected response format:", res.data);
+            }
         } catch (err) {
             console.error('Failed to fetch students:', err);
             message.error('Failed to load students');
@@ -54,127 +67,135 @@ const StudentManagement = () => {
     }, []);
 
     useEffect(() => {
-        fetchCoursesForFilter(); // Fetch courses for dropdown on mount
-        fetchStudents(searchTerm, filters); // Fetch initial students
-    }, [fetchStudents]); // Depend only on fetchStudents (which depends on nothing)
+        fetchCourses();
+        fetchStudents(searchText, filterCourseId, filterStatus);
+    }, [fetchCourses, fetchStudents, searchText, filterCourseId, filterStatus]);
 
     // Debounced search
     const debouncedSearch = useCallback(
         debounce((value) => {
-            setSearchTerm(value);
-            fetchStudents(value, filters);
+            setSearchText(value);
+            fetchStudents(value, filterCourseId, filterStatus);
         }, 300),
-        [fetchStudents, filters]
+        [fetchStudents, filterCourseId, filterStatus]
     );
 
-    const handleSearchChange = (e) => {
-        debouncedSearch(e.target.value);
+    const handleSearch = (value) => {
+        debouncedSearch(value);
     };
 
-    // Filter change handler
-    const handleFilterChange = (changedFilters) => {
-        const newFilters = { ...filters, ...changedFilters };
-        // If navigating here via URL param, keep that filter unless explicitly changed
-        if (courseId && !changedFilters.hasOwnProperty('courseId')) {
-             newFilters.courseId = courseId;
-        }
-        setFilters(newFilters);
-        fetchStudents(searchTerm, newFilters);
+    const handleCourseFilterChange = (value) => {
+        setFilterCourseId(value);
     };
 
-    const handleOpenGradeModal = (studentId, course) => {
-        setEditingScoreInfo({
-            student_id: studentId,
-            course_id: course.course_id,
-            course_name: course.course_name, // For display in modal
-            current_grade: course.grade
-        });
-        setNewGrade(course.grade); // Pre-fill with current grade
-        setGradeModalVisible(true);
+    const handleStatusFilterChange = (value) => {
+        setFilterStatus(value);
     };
 
-    const handleGradeModalCancel = () => {
-        setGradeModalVisible(false);
-        setEditingScoreInfo(null);
-        setNewGrade(null);
+    const showEditModal = (record) => {
+        setEditingRecord(record);
+        form.setFieldsValue({ grade: record.grade });
+        setIsModalVisible(true);
     };
 
-    const handleGradeModalOk = async () => {
-        if (newGrade === null || newGrade === '' || isNaN(parseFloat(newGrade))) {
-            message.error("请输入有效的成绩数字");
-            return;
-        }
-        if (!editingScoreInfo) return;
-
-        const payload = {
-            student_id: editingScoreInfo.student_id,
-            course_id: editingScoreInfo.course_id,
-            grade: parseFloat(newGrade) // Ensure it's a number
-        };
-
-        // Add loading state for modal button if desired
+    const handleOk = async () => {
         try {
-            await apiClient.put('/api/instructor/scores/update/', payload);
-            message.success(`成绩更新成功 for Course ID ${editingScoreInfo.course_id}`);
-            handleGradeModalCancel();
-            // Refresh student data to show the updated grade
-            fetchStudents(searchTerm, filters);
-        } catch (err) {
-            console.error("Failed to update score:", err);
-            message.error(err.response?.data?.error || "更新成绩失败");
+            const values = await form.validateFields();
+            setLoading(true); // Indicate loading state
+            console.log("Updating grade for enrollment:", editingRecord.enrollment_id, "with grade:", values.grade);
+            await apiClient.put(`/api/instructor/enrollments/${editingRecord.enrollment_id}/grade/`, {
+                grade: values.grade,
+            });
+            message.success('Grade updated successfully!');
+            setIsModalVisible(false);
+            setEditingRecord(null);
+            fetchStudents(searchText, filterCourseId, filterStatus);
+        } catch (error) {
+            console.error('Failed to update grade:', error.response?.data || error.message);
+            message.error(error.response?.data?.message || 'Failed to update grade.');
         } finally {
-             // Turn off loading state for modal button
+            setLoading(false); // Finish loading state
         }
+    };
+
+    const handleCancel = () => {
+        setIsModalVisible(false);
+        setEditingRecord(null);
     };
 
     const columns = [
-        { title: 'ID', dataIndex: 'user_id', key: 'user_id', width: 80 },
         {
-            title: 'Name', key: 'name',
-            render: (_, record) => `${record.first_name || ''} ${record.last_name || ''}`.trim() || record.username,
-            sorter: (a, b) => (a.last_name || '').localeCompare(b.last_name || ''),
+            title: 'ID',
+            dataIndex: 'user_id',
+            key: 'user_id',
+            sorter: (a, b) => a.user_id - b.user_id,
         },
-        { title: 'Username', dataIndex: 'username', key: 'username' },
-        { title: 'Email', dataIndex: 'email', key: 'email' },
         {
-            title: 'Courses Taken (from You)', dataIndex: 'courses', key: 'courses', width: '40%', // Adjust width as needed
-            render: (coursesList = [], record) => ( // Pass the whole student record
-                <Space direction="vertical" size={2}>
-                    {coursesList.map(c => {
-                        let courseTagColor = 'default'; // Default grey for completed/archived/dropped etc.
-                        if (c.state === 'active' && c.status === 'enrolled') {
-                            courseTagColor = 'processing'; // Blue for active & enrolled
-                        }
-
-                        return (
-                            <Space key={c.course_id} size={4}>
-                                <Tag color={courseTagColor}>
-                                    {c.course_name} ({c.year} {c.term}) - Status: {c.status} | State: {c.state}
-                                </Tag>
-                                <Text strong>Grade:</Text>
-                                <Text>{c.grade !== null ? c.grade : 'N/A'}</Text>
-                                <Tooltip title="Edit Grade">
-                                    <Button
-                                        icon={<EditOutlined />}
-                                        size="small"
-                                        type="text"
-                                        onClick={() => handleOpenGradeModal(record.user_id, c)}
-                                    />
-                                </Tooltip>
-                            </Space>
-                        );
-                    })}
+            title: 'Name',
+            dataIndex: 'name', // Assuming the API returns 'name' (first_name + last_name)
+            key: 'name',
+            sorter: (a, b) => a.name.localeCompare(b.name),
+            render: (text, record) => `${record.first_name} ${record.last_name}` // Combine first and last name
+        },
+        {
+            title: 'Username',
+            dataIndex: 'username',
+            key: 'username',
+            sorter: (a, b) => a.username.localeCompare(b.username),
+        },
+        {
+            title: 'Email',
+            dataIndex: 'email',
+            key: 'email',
+        },
+        {
+            title: 'Courses Taken (from You)',
+            key: 'enrollments',
+            dataIndex: 'enrollments',
+            render: (enrollments, record) => {
+                console.log(`Enrollment data for student ${record.user_id}:`, enrollments);
+                return (
+                    <Space direction="vertical" size="small" style={{ width: '100%' }}>
+                        {Array.isArray(enrollments) && enrollments.length > 0 ? enrollments.map((enrollment) => (
+                            <div key={enrollment.enrollment_id} style={{ border: '1px solid #e8e8e8', padding: '5px', borderRadius: '4px', width: '100%' }}>
+                                {/* Line 1: Course Details */}
+                                <div style={{ marginBottom: '4px' }}>
+                                    <Link to={`/teacher/courses/${enrollment.course_id}/modules`}>
+                                        <Tag color="blue">{enrollment.course_name} ({enrollment.year} {enrollment.term === 1 ? 'Spring' : enrollment.term === 2 ? 'Summer' : 'Fall'})</Tag>
+                                    </Link>
+                                    <Tag>Status: {enrollment.status}</Tag>
+                                    <Tag>State: {enrollment.course_state}</Tag>
+                                </div>
+                                {/* Line 2: Grade and Edit */}
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <Text strong>Grade: {enrollment.grade !== null ? enrollment.grade : 'N/A'}</Text>
+                                    <Tooltip title="Edit Grade">
+                                        <Button
+                                            icon={<EditOutlined />}
+                                            size="small"
+                                            onClick={() => showEditModal(enrollment)} // Pass the specific enrollment record
+                                        />
+                                    </Tooltip>
+                                </div>
+                            </div>
+                        )) : <Text type="secondary">No courses enrolled.</Text>}
+                    </Space>
+                );
+            },
+        },
+        {
+            title: 'Actions',
+            key: 'actions',
+            render: (text, record) => (
+                <Space size="middle">
+                    {/* Link to view student's profile or detailed progress */}
+                    <Tooltip title="View Student Details">
+                        <Link to={`/profile/?user_id=${record.user_id}`}>
+                            <Button icon={<EyeOutlined />} size="small" />
+                        </Link>
+                    </Tooltip>
+                    {/* Add other actions like message student if needed */}
                 </Space>
-            ),
-        },
-        {
-            title: 'Actions', key: 'actions', width: 100, align: 'center',
-            render: (_, record) => (
-                <Tooltip title="View Profile">
-                    <Link to={`/profile/${record.user_id}`}>
-                        <Button icon={<EyeOutlined />} size="small" />
-                    </Link>
-                </Tooltip>
             ),
         },
     ];
@@ -184,14 +205,15 @@ const StudentManagement = () => {
             <Title level={3}>Student Management</Title>
             <Paragraph>View students enrolled in your courses and manage grades.</Paragraph>
 
-             {/* Toolbar: Search, Filters */}
-             <Row justify="end" align="middle" style={{ marginBottom: 16 }}>
-                 <Col>
+            {/* Toolbar: Search, Filters */}
+            <Row justify="end" align="middle" style={{ marginBottom: 16 }}>
+                <Col>
                     <Space>
                         <Input
                             placeholder="Search Students..."
                             prefix={<SearchOutlined />}
-                            onChange={handleSearchChange}
+                            onSearch={handleSearch}
+                            onChange={(e) => setSearchText(e.target.value)}
                             style={{ width: 200 }}
                             allowClear
                         />
@@ -199,37 +221,37 @@ const StudentManagement = () => {
                             placeholder="Filter by Course"
                             allowClear
                             style={{ width: 200 }}
-                            value={filters.courseId} // Control component value
-                            onChange={(value) => handleFilterChange({ courseId: value })}
+                            value={filterCourseId}
+                            onChange={handleCourseFilterChange}
                             loading={courses.length === 0}
-                            disabled={!!courseId} // Disable if courseId came from URL
+                            disabled={!!paramCourseId}
                             showSearch
-                             filterOption={(input, option) =>
+                            filterOption={(input, option) =>
                                 option.children.toLowerCase().includes(input.toLowerCase())
                             }
                         >
-                             <Option value={null}>All My Courses</Option> {/* Add option for all */}
+                            <Option value="all">All My Courses</Option>
                             {courses.map(course => (
                                 <Option key={course.course_id} value={course.course_id}>
                                     {course.course_name} ({course.course_code})
                                 </Option>
                             ))}
                         </Select>
-                         <Select
+                        <Select
                             placeholder="Filter by Status"
                             allowClear
                             style={{ width: 140 }}
-                            value={filters.status} // Control component value
-                            onChange={(value) => handleFilterChange({ status: value })}
+                            value={filterStatus}
+                            onChange={handleStatusFilterChange}
                         >
-                            <Option value={null}>All Statuses</Option> {/* Add option for all */}
+                            <Option value="all">All Statuses</Option>
                             <Option value="enrolled">Enrolled</Option>
-                            <Option value="completed">Completed</Option>
-                             <Option value="dropped">Dropped</Option> {/* Add other relevant statuses */}
+                            <Option value="waitlisted">Waitlisted</Option>
+                            <Option value="dropped">Dropped</Option>
                         </Select>
                     </Space>
-                 </Col>
-             </Row>
+                </Col>
+            </Row>
 
             <Table
                 columns={columns}
@@ -239,29 +261,22 @@ const StudentManagement = () => {
                 pagination={{ pageSize: 10 }}
             />
 
-            {/* Grade Edit Modal */}
             <Modal
-                title={`Edit Grade for ${editingScoreInfo?.course_name || ''}`}
-                open={gradeModalVisible}
-                onOk={handleGradeModalOk}
-                onCancel={handleGradeModalCancel}
-                okText="Update Grade"
-                // Add confirmLoading prop to Ok button if needed
+                title={`Edit Grade for ${editingRecord?.course_name}`}
+                visible={isModalVisible}
+                onOk={handleOk}
+                onCancel={handleCancel}
+                confirmLoading={loading}
             >
-                <Paragraph>
-                    Student ID: {editingScoreInfo?.student_id} <br />
-                    Course ID: {editingScoreInfo?.course_id} <br />
-                    Current Grade: {editingScoreInfo?.current_grade ?? 'N/A'}
-                </Paragraph>
-                <InputNumber
-                    style={{ width: '100%' }}
-                    placeholder="Enter new grade (e.g., 85.5)"
-                    value={newGrade}
-                    onChange={setNewGrade} // Directly updates state
-                    min={0} // Optional: Set min/max grade
-                    max={100} // Optional: Set min/max grade
-                    step={0.5} // Optional: Set step
-                />
+                <Form form={form} layout="vertical" name="editGradeForm">
+                    <Form.Item
+                        name="grade"
+                        label="Grade"
+                        rules={[{ required: true, message: 'Please input the grade!' }]}
+                    >
+                        <InputNumber min={0} max={100} step={0.1} style={{ width: '100%' }} />
+                    </Form.Item>
+                </Form>
             </Modal>
         </div>
     );

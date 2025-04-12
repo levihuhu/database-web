@@ -18,7 +18,8 @@ import {
   TrophyOutlined,
   TeamOutlined,
   CheckCircleOutlined,
-  LoadingOutlined
+  LoadingOutlined,
+  SearchOutlined
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import apiClient from '../../services/api';
@@ -50,17 +51,6 @@ const StudentCourseList = () => {
   useEffect(() => {
     fetchCourses();
   }, []);
-
-  const handleAcceptAll = async () => {
-    try {
-      const response = await apiClient.post('/api/student/courses/accept-all/');
-      message.success(response.data.message);
-      fetchCourses(); // Refresh course list
-    } catch (error) {
-      console.error('Error accepting all courses:', error);
-      message.error('Failed to accept all courses');
-    }
-  };
 
   const getTermText = (term) => {
     switch(term) {
@@ -100,24 +90,20 @@ const StudentCourseList = () => {
   return (
       <div style={{ padding: '20px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-          <Title level={2}>Courses</Title>
-          <Popconfirm
-              title="Confirm enrollment in all courses?"
-              description="This will register all available courses."
-              onConfirm={handleAcceptAll}
-              okText="Confirm"
-              cancelText="Cancel"
+          <Title level={2}>My Courses</Title>
+          <Button 
+            type="primary" 
+            icon={<SearchOutlined />}
+            onClick={() => navigate('/student/browse-courses')}
           >
-            <Button type="primary" icon={<CheckCircleOutlined />}>
-              Accept All Courses
-            </Button>
-          </Popconfirm>
+            Browse All Courses
+          </Button>
         </div>
-        <Text type="secondary">Select a course to start learning</Text>
+        <Text type="secondary">Your enrolled courses</Text>
 
         {courses.length === 0 ? (
             <Empty
-                description="No courses available"
+                description="No courses enrolled yet"
                 style={{ marginTop: 40 }}
             />
         ) : (
@@ -139,10 +125,14 @@ const StudentCourseList = () => {
                     >
                       <Card.Meta
                           title={
-                            <Space>
-                              <span>{course.course_name}</span>
-                              {getStateTag(course.state)}
-                            </Space>
+                            <>
+                              <div style={{ whiteSpace: 'normal', wordBreak: 'break-word' }}>
+                                {course.course_name}
+                              </div>
+                              <div style={{ marginTop: 4 }}>
+                                {getStateTag(course.state)}
+                              </div>
+                            </>
                           }
                           description={
                             <div>
@@ -150,21 +140,24 @@ const StudentCourseList = () => {
                               <div style={{ marginTop: 8 }}>
                                 <Text>{course.course_description}</Text>
                               </div>
+                              {course.instructor_id && course.instructor_name && (
+                                <div style={{ marginTop: 8 }}>
+                                  <Text type="secondary">
+                                    Instructor: 
+                                    <a onClick={(e) => {
+                                      e.stopPropagation();
+                                      navigate(`/profile/?user_id=${course.instructor_id}`);
+                                    }}>
+                                      {course.instructor_name}
+                                    </a>
+                                  </Text>
+                                </div>
+                              )}
                               <div style={{ marginTop: 16 }}>
                                 <Space>
                                   <Tag icon={<BookOutlined />}>
                                     {course.year} {getTermText(course.term)}
                                   </Tag>
-                                  {course.total_score !== null && (
-                                      <Tag icon={<TrophyOutlined />}>
-                                        Score: {course.total_score}
-                                      </Tag>
-                                  )}
-                                  {course.rank !== null && (
-                                      <Tag icon={<TeamOutlined />}>
-                                        Rank: {course.rank}
-                                      </Tag>
-                                  )}
                                 </Space>
                               </div>
                               <div style={{ marginTop: 16 }}>

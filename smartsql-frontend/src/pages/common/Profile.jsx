@@ -1,36 +1,38 @@
 import React, { useState, useEffect } from 'react';
 import { Card, Avatar, Typography, Button, Form, Input, Radio, Tabs, message, Modal, Row, Col, Divider, Statistic, List } from 'antd';
 import { UserOutlined, EditOutlined, MailOutlined, SaveOutlined, CloseOutlined, EnvironmentOutlined, TeamOutlined } from '@ant-design/icons';
-import { useParams, Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import apiClient from '../../services/api';
 
 const { Title, Text, Paragraph } = Typography;
 const { TextArea } = Input;
 
 export default function Profile() {
-  const { userId } = useParams(); // 从URL获取用户ID
+  const location = useLocation();
+  const queryParams = new URLSearchParams(location.search);
+  const queryUserId = queryParams.get('user_id');
+  
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
   const [messageModal, setMessageModal] = useState(false);
   const [messageContent, setMessageContent] = useState('');
   const [form] = Form.useForm();
-  const [enrollments, setEnrollments] = useState(null); // Add state for enrollments
+  const [enrollments, setEnrollments] = useState(null);
   
-  // 获取当前登录用户ID
   const currentUserId = localStorage.getItem('user_id');
-  const isOwnProfile = currentUserId === userId || !userId;
+  const targetUserId = queryUserId || currentUserId;
+  const isOwnProfile = !queryUserId || (currentUserId === queryUserId);
   
   useEffect(() => {
     fetchUserData();
-  }, [userId]);
+  }, [targetUserId]);
   
   const fetchUserData = async () => {
     setLoading(true);
-    setEnrollments(null); // Reset enrollments on fetch
+    setEnrollments(null);
     try {
-      const targetId = userId || currentUserId;
-      const response = await apiClient.get(`/api/users/profile/?user_id=${targetId}`);
+      const response = await apiClient.get(`/api/users/profile/?user_id=${targetUserId}`);
       
       if (response.data.status === 'success') {
         const userData = response.data.data;
@@ -44,7 +46,6 @@ export default function Profile() {
           profile_info: userData.profile_info
         });
 
-        // Check if enrollment data is present (added by backend for instructor view)
         if (response.data.enrollments) {
           setEnrollments(response.data.enrollments);
         }
@@ -77,11 +78,13 @@ export default function Profile() {
   };
   
   const handleSendMessage = async () => {
+    if (!messageContent.trim()) {
+      message.warning('消息内容不能为空');
+      return;
+    }
     try {
-      console.log(userId)
-      console.log(messageContent)
       await apiClient.post('/api/messages/', {
-        receiver_id: userId,
+        receiver_id: targetUserId,
         content: messageContent
       });
       message.success('消息发送成功');
@@ -123,7 +126,6 @@ export default function Profile() {
   return (
     <div style={{ maxWidth: '800px', margin: '0 auto', padding: '20px' }}>
       <Card bordered={false} style={{ borderRadius: '12px', overflow: 'hidden', boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)' }}>
-        {/* 顶部操作按钮 */}
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '20px' }}>
           {isOwnProfile ? (
             <Button 
@@ -145,7 +147,6 @@ export default function Profile() {
           )}
         </div>
 
-        {/* 个人资料主体 */}
         <div style={{ textAlign: 'center', marginBottom: '30px' }}>
           <div style={{ position: 'relative', display: 'inline-block', marginBottom: '15px' }}>
             <Avatar 
@@ -186,8 +187,7 @@ export default function Profile() {
           )}
         </div>
         
-        {/* 编辑表单 */}
-        {editing ? (
+        {editing && isOwnProfile ? (
           <Form
             form={form}
             layout="vertical"
@@ -224,7 +224,6 @@ export default function Profile() {
           <>
             <Divider style={{ margin: '10px 0 30px' }} />
             
-            {/* 用户详细信息 */}
             <div style={{ maxWidth: '500px', margin: '0 auto' }}>
               <Row gutter={[0, 20]} style={{ textAlign: 'left' }}>
                 <Col span={24}>
@@ -257,7 +256,6 @@ export default function Profile() {
               </Row>
             </div>
 
-            {/* Display Enrollments if available (viewed by instructor) */}
             {enrollments && enrollments.length > 0 && (
               <>
                 <Divider />
@@ -288,14 +286,14 @@ export default function Profile() {
         )}
       </Card>
       
-      {/* 发送消息弹窗 */}
       <Modal
-        title={`发送消息给 ${user.first_name} ${user.last_name}`}
+        title={`发送消息给 ${user?.first_name || ''} ${user?.last_name || ''}`}
         open={messageModal}
         onOk={handleSendMessage}
         onCancel={() => setMessageModal(false)}
         okText="发送"
         cancelText="取消"
+        confirmLoading={loading}
       >
         <TextArea
           rows={4}
