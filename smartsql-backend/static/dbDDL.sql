@@ -136,26 +136,6 @@ CREATE TABLE Module_Exercise (
     FOREIGN KEY (exercise_id) REFERENCES Exercise(exercise_id) ON DELETE CASCADE
 );
 
-CREATE TABLE Student_Exercise (
-                                  id INT AUTO_INCREMENT PRIMARY KEY,
-                                  student_id INT NOT NULL,
-                                  exercise_id INT NOT NULL,
-                                  completed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                                  FOREIGN KEY (student_id) REFERENCES Student(student_id) ON DELETE CASCADE,
-                                  FOREIGN KEY (exercise_id) REFERENCES Exercise(exercise_id) ON DELETE CASCADE
-);
-
--- Question
-CREATE TABLE Question (
-    question_id INT AUTO_INCREMENT PRIMARY KEY,
-    question_text TEXT,
-    difficulty_level ENUM('Easy', 'Medium', 'Hard'),
-    tags VARCHAR(255),
-    created_by INT NOT NULL,
-    FOREIGN KEY (created_by)
-        REFERENCES Instructor (instructor_id)
-);
-
 
 -- Error_Log
 CREATE TABLE Error_Log (

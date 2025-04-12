@@ -10,12 +10,19 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
+import os
 from pathlib import Path
 from datetime import timedelta
-import pymysql
-pymysql.install_as_MySQLdb()
+from dotenv import load_dotenv # Import load_dotenv
+# import pymysql
+# pymysql.install_as_MySQLdb()
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# --- Load .env file ---
+env_path = BASE_DIR / '.env' # Construct path to .env file
+load_dotenv(dotenv_path=env_path) # Load the .env file
+# --- End Load .env file ---
 
 
 # Quick-start development settings - unsuitable for production
@@ -157,3 +164,7 @@ SIMPLE_JWT = {
     'REFRESH_TOKEN_LIFETIME': timedelta(days=36500),
     # ... 其他配置
 }
+
+# --- Get OpenAI API Key ---
+OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
+# --- End Get OpenAI API Key ---
