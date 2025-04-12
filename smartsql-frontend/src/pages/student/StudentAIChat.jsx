@@ -1,11 +1,13 @@
-import React, { useState, useEffect } from 'react';
-import { Input, Button, Card, Typography, Spin, Avatar, Divider, message, Switch, Select } from 'antd';
+import React, { useState, useEffect, useRef } from 'react';
+import { Input, Button, Card, Typography, Spin, Avatar, Divider, message, Switch, Select, List, Alert, Tabs } from 'antd';
 import { SendOutlined, RobotOutlined, UserOutlined } from '@ant-design/icons';
 import axios from 'axios';
+
 
 const { TextArea } = Input;
 const { Title, Text, Paragraph } = Typography;
 const { Option } = Select;
+const { TabPane } = Tabs;
 
 const StudentAIChat = () => {
   const [messages, setMessages] = useState([
@@ -21,6 +23,9 @@ const StudentAIChat = () => {
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [includeProgressContext, setIncludeProgressContext] = useState(true);
   const [isFetchingData, setIsFetchingData] = useState(false);
+  const [error, setError] = useState(null);
+  const [mode, setMode] = useState('general');
+  const messagesEndRef = useRef(null);
 
   // Get token and user data on component mount
   useEffect(() => {
@@ -283,6 +288,7 @@ const StudentAIChat = () => {
     setMessages(prev => [...prev, userMessage]);
     setInput('');
     setLoading(true);
+    setError(null);
 
     try {
       // Check if token exists
@@ -458,7 +464,7 @@ const StudentAIChat = () => {
       console.log('Sending request to API endpoint:', `${API_URL}/api/ai/chat/`);
       const response = await axios.post(
           `${API_URL}/api/ai/chat/`,
-          { messages: apiMessages },
+          { message: input, mode: mode },
           {
             headers: {
               'Content-Type': 'application/json',
@@ -467,14 +473,15 @@ const StudentAIChat = () => {
           }
       );
 
-      if (response.data && response.data.content) {
-        const aiResponse = {
-          role: 'assistant',
-          content: response.data.content
-        };
-        setMessages(prev => [...prev, aiResponse]);
+      // Log the received data structure JUST before the check
+      console.log("Received response data:", response.data);
+
+      if (response.data && response.data.reply) {
+        // Standardize the message structure to { role: ..., content: ... }
+        const aiMessage = { role: 'assistant', content: response.data.reply }; 
+        setMessages(prev => [...prev, aiMessage]);
       } else {
-        // Fallback for unexpected response format
+        // Fallback for unexpected response format - Ensure this also uses the standard structure
         const aiResponse = {
           role: 'assistant',
           content: 'Sorry, I received an unexpected response format. Please try again later.'
@@ -596,6 +603,23 @@ const StudentAIChat = () => {
     return "I don't have access to your learning progress data. Make sure you're logged in with the correct account.";
   };
 
+  // Scroll to bottom whenever messages update
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  // Handle Tab change
+  const handleModeChange = (key) => {
+    setMode(key);
+    // Optionally clear messages when switching modes, or keep them
+    // setMessages([]); 
+    setError(null); // Clear error on mode change
+  };
+
   return (
       <div style={{ height: 'calc(100vh - 200px)', display: 'flex', flexDirection: 'column' }}>
         {/* Debug panel - remove in production - made more compact */}
@@ -666,6 +690,15 @@ const StudentAIChat = () => {
             bodyStyle={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden', padding: '12px' }}
         >
           <Divider style={{ margin: '0 0 12px 0' }} />
+
+          <Tabs defaultActiveKey="general" onChange={handleModeChange}>
+            <TabPane tab="General SQL Helper" key="general">
+              <Paragraph type="secondary">Ask general questions about SQL syntax, database concepts, or best practices.</Paragraph>
+            </TabPane>
+            <TabPane tab="Platform Helper" key="system">
+               <Paragraph type="secondary">Ask questions about your courses, recent exercises, or progress on the SmartSQL platform.</Paragraph>
+            </TabPane>
+          </Tabs>
 
           <div style={{
             flex: 1,

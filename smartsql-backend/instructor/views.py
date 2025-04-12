@@ -419,7 +419,7 @@ def instructor_exercises(request):
 
         with connection.cursor() as cursor:
              query = """
-                 SELECT e.exercise_id, e.title, e.description, e.hint, e.expected_answer, e.difficulty, e.table_schema,
+                 SELECT DISTINCT e.exercise_id, e.title, e.description, e.hint, e.expected_answer, e.difficulty, e.table_schema,
                         m.module_id, m.module_name, c.course_name, c.course_id
                  FROM Exercise e LEFT JOIN Module_Exercise me ON e.exercise_id = me.exercise_id
                  LEFT JOIN Module m ON me.module_id = m.module_id
@@ -569,64 +569,88 @@ def instructor_exercise_detail(request, exercise_id):
 @permission_classes([IsAuthenticated])
 @safe_api_view
 def instructor_students(request):
-    """GET: Students enrolled in instructor's courses, filterable."""
+    """GET: Students enrolled in instructor's courses, filterable, including their enrollments."""
     user = request.user
     instructor_id = user.user_id
 
     course_id_filter = request.query_params.get('course_id')
-    status_filter = request.query_params.get('status', '') # Keep status filter for enrollment status
+    status_filter = request.query_params.get('status') # Get status filter
     search_term = request.query_params.get('search', '')
 
-    with connection.cursor() as cursor:
-        query = """
-            SELECT u.user_id, u.username, u.first_name, u.last_name, u.email,
-                   c.course_id, c.course_name, c.course_code, c.year, c.term,
-                   e.status as enrollment_status, -- Aliased to avoid conflict
-                   c.state as course_state,      -- Explicitly select course state
-                   s.total_score as grade
-            FROM Enrollment e
-            JOIN Users u ON e.student_id = u.user_id
-            JOIN Course c ON e.course_id = c.course_id
-            LEFT JOIN Score s ON e.student_id = s.student_id AND e.course_id = s.course_id
-            WHERE c.instructor_id = %s """
-        params = [instructor_id]
-
-        if course_id_filter: query += " AND e.course_id = %s "; params.append(course_id_filter)
-        # Filter by enrollment status if provided
-        if status_filter: query += " AND e.status = %s "; params.append(status_filter)
-        if search_term:
-             query += " AND (u.username LIKE %s OR u.first_name LIKE %s OR u.last_name LIKE %s OR u.email LIKE %s) "
-             like = f"%{search_term}%"; params.extend([like, like, like, like])
-
-        # Keep the sorting logic, or adjust if needed
-        query += """ ORDER BY CASE WHEN e.status = 'enrolled' THEN 0 ELSE 1 END,
-                    c.year DESC, c.term DESC, c.course_name, u.last_name, u.first_name """
-
-        cursor.execute(query, params)
-        enrollments = dictfetchall(cursor)
-
-    # Process results (grouping by student remains the same)
     students_data = {}
-    for row in enrollments:
-        student_id = row['user_id']
-        if student_id not in students_data:
-            students_data[student_id] = {
-                'user_id': student_id, 'username': row['username'], 'first_name': row['first_name'],
-                'last_name': row['last_name'], 'email': row['email'], 'courses': [],
-                'has_active_enrollment': False # This logic might need adjustment based on requirements
-            }
-        course_info = {
-            'course_id': row['course_id'], 'course_name': row['course_name'], 'course_code': row['course_code'],
-            'year': row['year'], 'term': map_term_to_str(row['term']),
-            'status': row['enrollment_status'], # Use alias
-            'state': row['course_state'], # Add course state
-            'grade': row.get('grade') # Use the grade fetched from Score table
-        }
-        students_data[student_id]['courses'].append(course_info)
-        if row['enrollment_status'] == 'enrolled': # Use alias
-             students_data[student_id]['has_active_enrollment'] = True
+    try:
+        with connection.cursor() as cursor:
+            # Step 1: Find distinct students matching criteria based on at least one enrollment
+            # We select students first, then fetch their enrollments separately.
+            student_query = """
+                SELECT DISTINCT u.user_id, u.username, u.first_name, u.last_name, u.email
+                FROM Users u
+                JOIN Enrollment e ON u.user_id = e.student_id
+                JOIN Course c ON e.course_id = c.course_id
+                WHERE c.instructor_id = %s AND u.user_type = 'Student'
+            """
+            params = [instructor_id]
 
-    return Response({'students': list(students_data.values())})
+            # Apply filters to the student query
+            if course_id_filter:
+                student_query += " AND e.course_id = %s "
+                params.append(course_id_filter)
+            if status_filter:
+                student_query += " AND e.status = %s "
+                params.append(status_filter)
+            if search_term:
+                 student_query += " AND (u.username LIKE %s OR u.first_name LIKE %s OR u.last_name LIKE %s OR u.email LIKE %s) "
+                 like = f"%{search_term}%"; params.extend([like, like, like, like])
+
+            student_query += " ORDER BY u.last_name, u.first_name "
+
+            cursor.execute(student_query, params)
+            students = dictfetchall(cursor)
+
+            student_ids = [s['user_id'] for s in students]
+
+            # Initialize students_data with basic info and empty enrollments
+            for student in students:
+                students_data[student['user_id']] = {
+                     **student, # Spread basic student info
+                    'enrollments': [] # Initialize empty enrollments list
+                }
+
+            # Step 2: Fetch all relevant enrollments for these students in instructor's courses
+            if student_ids: # Only query if there are students found
+                enrollment_query = """
+                    SELECT
+                        e.enrollment_id, e.student_id, e.status,
+                        c.course_id, c.course_name, c.course_code, c.year, c.term, c.state as course_state,
+                        s.total_score as grade
+                    FROM Enrollment e
+                    JOIN Course c ON e.course_id = c.course_id
+                    LEFT JOIN Score s ON e.student_id = s.student_id AND e.course_id = s.course_id
+                    WHERE c.instructor_id = %s AND e.student_id IN %s
+                    ORDER BY c.year DESC, c.term DESC
+                """
+                # Ensure student_ids is a tuple for the IN clause
+                cursor.execute(enrollment_query, [instructor_id, tuple(student_ids)])
+                all_enrollments = dictfetchall(cursor)
+
+                # Step 3: Populate the enrollments list for each student
+                for enrollment in all_enrollments:
+                    student_id = enrollment['student_id']
+                    if student_id in students_data:
+                         enrollment['term'] = map_term_to_str(enrollment['term']) # Map term number to string
+                         students_data[student_id]['enrollments'].append(enrollment)
+
+    except Exception as e:
+        print(f"Error fetching student enrollments: {e}")
+        # Depending on desired behavior, you might return partial data or an error
+        # For now, just log and return what we have (might be empty)
+
+    # Filter out students who ended up with no enrollments after potential filtering mismatches
+    # (though the initial query should prevent this unless status filter is complex)
+    # final_student_list = [s for s in students_data.values() if s['enrollments']]
+
+
+    return Response({'students': list(students_data.values())}) # Return the populated dictionary values as a list
 
 # === Dashboard View ===
 @api_view(['GET'])
@@ -684,6 +708,177 @@ def instructor_dashboard_data(request):
         # Add more data points: recently graded exercises, pending tasks, etc.
     }
     return Response(dashboard_data)
+
+# === Messaging Views ===
+
+@api_view(['GET', 'POST'])
+@authentication_classes([CustomJWTAuthentication])
+@permission_classes([IsAuthenticated])
+@safe_api_view
+def instructor_messages_api(request):
+    """GET: Fetch messages received by instructor. POST: Send a new message (private or announcement)."""
+    instructor_id = request.user.user_id
+
+    if request.method == 'GET':
+        search_term = request.query_params.get('search', '')
+        
+        with connection.cursor() as cursor:
+            # Fetch private messages received and announcements sent by this instructor
+            query = """
+                -- Received Private Messages
+                SELECT 
+                    m.message_id,
+                    m.sender_id,
+                    u_sender.first_name as sender_first_name,
+                    u_sender.last_name as sender_last_name,
+                    u_sender.username as sender_username,
+                    m.message_content,
+                    m.timestamp,
+                    'private' as message_type_val,
+                    NULL as course_context_id, -- No course context for received private
+                    NULL as course_context_name
+                FROM Message m
+                JOIN PrivateMessage pm ON m.message_id = pm.message_id
+                JOIN Users u_sender ON m.sender_id = u_sender.user_id
+                WHERE pm.receiver_id = %s
+                
+                UNION ALL
+                
+                -- Sent Announcements (linked to courses taught by instructor)
+                SELECT 
+                    m.message_id,
+                    m.sender_id, -- Sender is the instructor
+                    u_sender.first_name as sender_first_name,
+                    u_sender.last_name as sender_last_name,
+                    u_sender.username as sender_username,
+                    m.message_content,
+                    m.timestamp,
+                    'announcement' as message_type_val,
+                    a.course_id as course_context_id,
+                    c.course_name as course_context_name
+                FROM Message m
+                JOIN Announcement a ON m.message_id = a.message_id
+                JOIN Course c ON a.course_id = c.course_id
+                JOIN Users u_sender ON m.sender_id = u_sender.user_id
+                WHERE m.sender_id = %s -- Only announcements sent by this instructor
+            """
+            params = [instructor_id, instructor_id]
+
+            # Add search filter if provided
+            if search_term:
+                 query += """ AND (
+                     m.message_content LIKE %s OR 
+                     u_sender.username LIKE %s OR 
+                     u_sender.first_name LIKE %s OR 
+                     u_sender.last_name LIKE %s OR
+                     c.course_name LIKE %s
+                 ) """
+                 like = f"%{search_term}%"; params.extend([like] * 5)
+
+            query += " ORDER BY timestamp DESC"
+            
+            cursor.execute(query, params)
+            messages = dictfetchall(cursor)
+            
+        return Response({'messages': messages})
+
+    elif request.method == 'POST':
+        data = request.data
+        message_type = data.get('message_type') # 'private' or 'announcement'
+        content = data.get('content')
+        
+        if not content:
+            return Response({'error': 'Message content cannot be empty.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        with transaction.atomic():
+            with connection.cursor() as cursor:
+                # Insert into Message table first
+                cursor.execute("""
+                    INSERT INTO Message (sender_id, message_type, message_content, timestamp)
+                    VALUES (%s, %s, %s, NOW())
+                """, [instructor_id, message_type, content])
+                message_id = cursor.lastrowid
+
+                if message_type == 'private':
+                    receiver_id = data.get('receiver_id')
+                    if not receiver_id:
+                        raise ValueError("Receiver ID is required for private messages.") # Raise error to rollback transaction
+                    try: receiver_id = int(receiver_id)
+                    except ValueError: raise ValueError("Invalid Receiver ID.")
+
+                    # Check if receiver exists (optional but recommended)
+                    cursor.execute("SELECT 1 FROM Users WHERE user_id = %s", [receiver_id])
+                    if not cursor.fetchone():
+                        raise ValueError("Receiver user does not exist.")
+                        
+                    cursor.execute("""
+                        INSERT INTO PrivateMessage (message_id, receiver_id)
+                        VALUES (%s, %s)
+                    """, [message_id, receiver_id])
+                    msg_text = 'Private message sent successfully.'
+
+                elif message_type == 'announcement':
+                    course_id = data.get('course_id') # Can be null/empty for 'all'
+                    if not course_id:
+                        # Send to all students in all courses taught by this instructor
+                        cursor.execute("""
+                            INSERT INTO Announcement (message_id, course_id) VALUES (%s, NULL)
+                        """, [message_id]) # Use NULL for course_id to signify global
+                        msg_text = 'Announcement sent to all students in your courses.'
+                    else:
+                        # Send to specific course
+                        try: course_id = int(course_id)
+                        except ValueError: raise ValueError("Invalid Course ID.")
+                        
+                        # Verify instructor owns the course
+                        is_owner, error_response = check_instructor_ownership(instructor_id, course_id=course_id)
+                        if not is_owner: raise PermissionError("Instructor does not own this course.")
+                        
+                        cursor.execute("""
+                            INSERT INTO Announcement (message_id, course_id)
+                            VALUES (%s, %s)
+                        """, [message_id, course_id])
+                        msg_text = 'Announcement sent successfully to the selected course.'
+                else:
+                    raise ValueError("Invalid message type.")
+
+        return Response({'message': msg_text}, status=status.HTTP_201_CREATED)
+
+
+@api_view(['GET'])
+@authentication_classes([CustomJWTAuthentication])
+@permission_classes([IsAuthenticated])
+@safe_api_view
+def instructor_recipient_list_api(request):
+    """GET: Fetches potential recipients (students in instructor's courses) and courses for announcements."""
+    instructor_id = request.user.user_id
+    recipients = {'students': [], 'courses': []}
+
+    with connection.cursor() as cursor:
+        # Get distinct students enrolled in any course taught by the instructor
+        cursor.execute("""
+            SELECT DISTINCT u.user_id, u.username, u.first_name, u.last_name
+            FROM Users u
+            JOIN Enrollment e ON u.user_id = e.student_id
+            JOIN Course c ON e.course_id = c.course_id
+            WHERE c.instructor_id = %s AND e.status = 'enrolled' AND u.user_type = 'Student'
+            ORDER BY u.last_name, u.first_name
+        """, [instructor_id])
+        recipients['students'] = dictfetchall(cursor)
+
+        # Get courses taught by the instructor
+        cursor.execute("""
+            SELECT course_id, course_name, course_code, year, term
+            FROM Course 
+            WHERE instructor_id = %s
+            ORDER BY year DESC, term DESC, course_name
+        """, [instructor_id])
+        courses = dictfetchall(cursor)
+        for c in courses:
+            c['term'] = map_term_to_str(c['term'])
+        recipients['courses'] = courses
+
+    return Response(recipients)
 
 # === Score Update View ===
 @api_view(['PUT'])
