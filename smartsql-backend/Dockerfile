@@ -16,4 +16,5 @@ RUN pip install --upgrade pip && pip install -r requirements.txt
 COPY . .
 
 # 设置默认端口（Cloud Run 会自动设置 PORT 环境变量）
-CMD ["gunicorn", "smartsql.wsgi:application", "--bind", "0.0.0.0:$PORT"]
+CMD gunicorn smartsql.wsgi:application --bind 0.0.0.0:$PORT
+
