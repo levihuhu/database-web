@@ -4,7 +4,6 @@ import { Layout, Menu, Avatar, Dropdown, Space, Typography } from 'antd';
 import {
   UserOutlined,
   DashboardOutlined,
-  MessageOutlined,
   TeamOutlined,
   BookOutlined,
   BarChartOutlined,
@@ -12,15 +11,15 @@ import {
   LogoutOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
-  DatabaseOutlined,
-  OrderedListOutlined
+  DatabaseOutlined, OrderedListOutlined
 } from '@ant-design/icons';
-import ChatWidget from '../common/ChatWidget';
+
 
 const { Header, Sider, Content } = Layout;
 const { Title, Text } = Typography;
 
-const TeacherLayout = () => {
+
+const TeacherLayout = ({ children }) => {
   const [collapsed, setCollapsed] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
@@ -28,43 +27,47 @@ const TeacherLayout = () => {
 
   const menuItems = [
     {
-      key: `${teacherPrefix}`,
-      icon: <DashboardOutlined />,
-      label: <Link to={`${teacherPrefix}`}>Dashboard</Link>,
-    },
-    {
       key: `${teacherPrefix}/courses`,
       icon: <BookOutlined />,
-      label: <Link to={`${teacherPrefix}/courses`}>My Courses</Link>,
+      label: <Link to={`${teacherPrefix}/courses`}>Course Management</Link>,
     },
     {
       key: `${teacherPrefix}/modules`,
       icon: <OrderedListOutlined />,
-      label: <Link to={`${teacherPrefix}/modules`}>Modules</Link>,
+      label: <Link to={`${teacherPrefix}/modules`}>Module Management</Link>,
     },
     {
       key: `${teacherPrefix}/sql-exercises`,
       icon: <DatabaseOutlined />,
-      label: <Link to={`${teacherPrefix}/sql-exercises`}>Exercises</Link>,
+      label: <Link to={`${teacherPrefix}/sql-exercises`}>Exercises Management</Link>,
     },
     {
       key: `${teacherPrefix}/students`,
       icon: <TeamOutlined />,
-      label: <Link to={`${teacherPrefix}/students`}>Students</Link>,
+      label: <Link to={`${teacherPrefix}/students`}>Student Management</Link>,
     },
     {
-      key: `${teacherPrefix}/messages`,
-      icon: <MessageOutlined />,
-      label: <Link to={`${teacherPrefix}/messages`}>Messages</Link>,
+      key: `${teacherPrefix}/grades`,
+      icon: <BarChartOutlined />,
+      label: <Link to={`${teacherPrefix}/grades`}>Grade Management</Link>,
+    },
+    {
+      key: '/settings', //
+      icon: <SettingOutlined />,
+      label: <Link to="/settings">System Settings</Link>,
     },
   ];
 
   const handleMenuClick = ({ key }) => {
     switch (key) {
       case 'profile':
-        navigate(`/profile/`);
+        navigate(`/profile/${localStorage.getItem('user_id')}`);
+        break;
+      case 'settings':
+        navigate('/settings');
         break;
       case 'logout':
+        // logout logic here
         localStorage.clear();
         navigate('/login');
         break;
@@ -82,6 +85,11 @@ const TeacherLayout = () => {
         label: 'Profile',
       },
       {
+        key: 'settings',
+        icon: <SettingOutlined />,
+        label: 'Account Settings',
+      },
+      {
         type: 'divider',
       },
       {
@@ -91,6 +99,7 @@ const TeacherLayout = () => {
       },
     ]
   };
+
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
@@ -144,7 +153,7 @@ const TeacherLayout = () => {
             <Dropdown menu={userMenuItems} placement="bottomRight">
               <Space style={{ cursor: 'pointer' }}>
                 <Avatar icon={<UserOutlined />} />
-                <Text>{localStorage.getItem('username')}</Text>
+                <Text>Mr. Smith</Text>
               </Space>
             </Dropdown>
           </div>
@@ -153,15 +162,13 @@ const TeacherLayout = () => {
           style={{
             margin: '24px 16px',
             padding: 24,
-            background: '#f0f2f5',
-            minHeight: `calc(100vh - 64px - 48px)`,
-            borderRadius: 4,
-            position: 'relative'
+            background: '#fff',
+            minHeight: 280,
+            borderRadius: 4
           }}
         >
           <Outlet />
         </Content>
-        <ChatWidget />
       </Layout>
     </Layout>
   );

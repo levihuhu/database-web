@@ -1,107 +1,64 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Layout, Menu, Avatar, Dropdown, Space, Typography } from 'antd';
 import { 
   UserOutlined, 
   MessageOutlined, 
   BookOutlined,
-  DatabaseOutlined,
-  CodeOutlined,
+  ScheduleOutlined,
+  FileOutlined,
+  SettingOutlined,
   LogoutOutlined,
   MenuFoldOutlined,
-  MenuUnfoldOutlined,
-  DashboardOutlined
+  MenuUnfoldOutlined
 } from '@ant-design/icons';
-import { Link, useLocation, useNavigate, Outlet } from 'react-router-dom';
-import ChatWidget from '../common/ChatWidget';
+import { Link, useLocation } from 'react-router-dom';
 
 const { Header, Sider, Content } = Layout;
 const { Title, Text } = Typography;
 
 const StudentLayout = ({ children }) => {
   const [collapsed, setCollapsed] = useState(false);
-  const [selectedKeys, setSelectedKeys] = useState(['/student']);
   const location = useLocation();
-  const navigate = useNavigate();
 
-  // Update selected menu item based on current path
-  useEffect(() => {
-    const pathname = location.pathname;
-    
-    // Find the most specific matching menu item
-    const menuPaths = [
-      '/student/courses',
-      '/student/browse-courses',
-      '/student/exercises',
-      '/student/sql',
-      '/student/ai-chat',
-      '/student/messages',
-      '/student'
-    ];
-    
-    // Sort by specificity (length) to match the most specific path first
-    const matchedPath = menuPaths
-      .sort((a, b) => b.length - a.length)
-      .find(path => pathname.startsWith(path));
-    
-    if (matchedPath) {
-      setSelectedKeys([matchedPath]);
-    }
-  }, [location.pathname]);
-
-  // Logout function
-  const handleLogout = () => {
-    localStorage.removeItem('access');
-    localStorage.removeItem('refresh');
-    navigate('/login');
-  };
-
-  // Menu items
   const menuItems = [
     {
       key: '/student',
-      icon: <DashboardOutlined />,
-      label: <Link to="/student">Dashboard</Link>,
+      icon: <MessageOutlined />,
+      label: <Link to="/student">AI 助手</Link>,
     },
     {
       key: '/student/courses',
       icon: <BookOutlined />,
-      label: <Link to="/student/courses">My Courses</Link>,
+      label: <Link to="/student/courses">我的课程</Link>,
     },
     {
-      key: '/student/browse-courses',
-      icon: <BookOutlined />,
-      label: <Link to="/student/browse-courses">Browse Courses</Link>,
+      key: '/student/schedule',
+      icon: <ScheduleOutlined />,
+      label: <Link to="/student/schedule">课程表</Link>,
     },
     {
-      key: '/student/exercises',
-      icon: <DatabaseOutlined />,
-      label: <Link to="/student/exercises">Exercises</Link>,
+      key: '/student/assignments',
+      icon: <FileOutlined />,
+      label: <Link to="/student/assignments">作业</Link>,
     },
     {
-      key: '/student/sql',
-      icon: <CodeOutlined />,
-      label: <Link to="/student/sql">Dynamic Query</Link>,
+      key: '/student/settings',
+      icon: <SettingOutlined />,
+      label: <Link to="/student/settings">设置</Link>,
     },
-    {
-      key: '/student/ai-chat',
-      icon: <MessageOutlined />,
-      label: <Link to="/student/ai-chat">AI Assistant</Link>,
-    },
-    {
-      key: '/student/messages',
-      icon: <MessageOutlined />,
-      label: <Link to="/student/messages">Messages</Link>,
-    }
   ];
 
-  // User menu items
   const userMenuItems = {
     items: [
       {
         key: 'profile',
         icon: <UserOutlined />,
-        label: 'Profile',
-        onClick: () => navigate('/profile')
+        label: '个人资料',
+      },
+      {
+        key: 'settings',
+        icon: <SettingOutlined />,
+        label: '账户设置',
       },
       {
         type: 'divider',
@@ -109,8 +66,7 @@ const StudentLayout = ({ children }) => {
       {
         key: 'logout',
         icon: <LogoutOutlined />,
-        label: 'Logout',
-        onClick: handleLogout
+        label: '退出登录',
       },
     ]
   };
@@ -134,14 +90,13 @@ const StudentLayout = ({ children }) => {
       >
         <div style={{ height: 64, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <Title level={4} style={{ margin: 0, color: '#1890ff' }}>
-            {collapsed ? 'SQL' : 'SmartSQL Learning'}
+            {collapsed ? 'SMS' : '学生学习系统'}
           </Title>
         </div>
         <Menu
           theme="light"
           mode="inline"
           selectedKeys={[location.pathname]}
-          defaultSelectedKeys={['/student']}
           items={menuItems}
         />
       </Sider>
@@ -155,8 +110,7 @@ const StudentLayout = ({ children }) => {
           position: 'sticky',
           top: 0,
           zIndex: 1,
-          width: '100%',
-          boxShadow: '0 1px 4px rgba(0,21,41,.08)'
+          width: '100%'
         }}>
           <div style={{ paddingLeft: 16 }}>
             {React.createElement(collapsed ? MenuUnfoldOutlined : MenuFoldOutlined, {
@@ -169,7 +123,7 @@ const StudentLayout = ({ children }) => {
             <Dropdown menu={userMenuItems} placement="bottomRight">
               <Space style={{ cursor: 'pointer' }}>
                 <Avatar icon={<UserOutlined />} />
-                <Text>{localStorage.getItem('username')}</Text>
+                <Text>李同学</Text>
               </Space>
             </Dropdown>
           </div>
@@ -178,16 +132,14 @@ const StudentLayout = ({ children }) => {
           style={{
             margin: '24px 16px',
             padding: 24,
+            background: '#fff',
             minHeight: 280,
             borderRadius: 4,
-            background: '#fff',
-            overflow: 'auto',
-            position: 'relative',
+            overflow: 'auto'
           }}
         >
-          <Outlet />
+          {children}
         </Content>
-        <ChatWidget />
       </Layout>
     </Layout>
   );
