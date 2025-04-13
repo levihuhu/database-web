@@ -1,6 +1,7 @@
 import os
 import json
-from openai import OpenAI
+import re
+from openai import OpenAI  # ✅ 保留新 SDK
 from rest_framework.decorators import api_view, permission_classes, authentication_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -8,18 +9,16 @@ from rest_framework import status
 from core.authentication import CustomJWTAuthentication
 from django.conf import settings
 from core.models import Users, Student
-from django.db import connection, transaction
+from django.db import connection
 from rest_framework.views import APIView
-import openai
-import re # For basic SQL validation
 
-# Initialize OpenAI client
+# ✅ 初始化 OpenAI client
+
+print(f"OPENAI_API_KEY: {settings.OPENAI_API_KEY}")
 client = OpenAI(api_key=settings.OPENAI_API_KEY)
 
-# Set up OpenAI API key
-openai.api_key = settings.OPENAI_API_KEY
-
 DB_SCHEMA_DESC = settings.DB_SCHEMA_DESCRIPTION
+
 
 def get_user_info_from_db(user_id):
     """
@@ -229,7 +228,7 @@ class ChatbotAPIView(APIView):
                 **Generated SQL Query (Remember: exact names, case-sensitive, raw SQL only):**
                 """
 
-                completion_sql = openai.chat.completions.create(
+                completion_sql = client.chat.completions.create(
                     model="gpt-4o", # Or your preferred model
                     messages=[{"role": "user", "content": sql_generation_prompt}],
                     temperature=0.2, # Lower temperature for more deterministic SQL
@@ -279,7 +278,7 @@ class ChatbotAPIView(APIView):
                 messages_for_summary.append({"role": "user", "content": summarization_prompt})
 
                 try:
-                    completion_summary = openai.chat.completions.create(
+                    completion_summary = client.chat.completions.create(
                         model="gpt-4o", # Use a more capable model for summarization if possible
                         messages=messages_for_summary
                     )
@@ -312,7 +311,7 @@ class ChatbotAPIView(APIView):
                 # for msg in history: messages_for_general.append(msg)
                 messages_for_general.append({"role": "user", "content": user_message})
 
-                completion_general = openai.chat.completions.create(
+                completion_general = client.chat.completions.create(
                     model="gpt-4o",
                     messages=messages_for_general
                 )
@@ -322,7 +321,7 @@ class ChatbotAPIView(APIView):
             else:
                  return Response({"error": "Invalid mode specified."}, status=400)
 
-        except openai.APIError as e:
+        except OpenAIError as e:
              print(f"OpenAI API Error: {e}")
              return Response({"error": f"AI service error: {e}"}, status=503)
         except ValueError as e: # Catch validation/generation errors
