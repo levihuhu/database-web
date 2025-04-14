@@ -8,7 +8,98 @@ from rest_framework import status
 from config import messages as msg
 from django.db.models import Q
 from django.db import connection, transaction
+import re
+from django.contrib.auth.hashers import make_password
+from django.db import IntegrityError
 
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny]) # Allow anyone to access the signup API
+def signup_api(request):
+    data = request.data
+    username = data.get('username')
+    email = data.get('email')
+    password = data.get('password') # Storing plain text as per previous request
+    first_name = data.get('first_name')
+    last_name = data.get('last_name')
+    user_type = 'Student' # Hardcoded as per requirement
+    profile_info = data.get('profile_info', None) # Get profile_info, default to None if not provided
+
+    # --- Input Validation (remains the same) ---
+    errors = {}
+    if not username or len(username) < 8 or not re.match(r'^[a-zA-Z0-9_-]+$', username):
+        errors['username'] = '用户名必须至少8位，且只能包含字母、数字、下划线或连字符。'
+    if not email or '@' not in email:
+        errors['email'] = '请输入有效的邮箱地址。'
+    if not password or len(password) < 8:
+        errors['password'] = '密码必须至少8位。'
+    if not first_name:
+        errors['first_name'] = '名字不能为空。'
+    if not last_name:
+        errors['last_name'] = '姓氏不能为空。'
+
+    if errors:
+        return Response({'status': 'error', 'errors': errors}, status=status.HTTP_400_BAD_REQUEST)
+    print("👌🏻")
+    # --- Uniqueness Check (using raw SQL) ---
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT EXISTS(SELECT 1 FROM Users WHERE username = %s)", [username])
+            if cursor.fetchone()[0]:
+                errors['username'] = '用户名已被注册。'
+                
+            cursor.execute("SELECT EXISTS(SELECT 1 FROM Users WHERE email = %s)", [email])
+            if cursor.fetchone()[0]:
+                errors['email'] = '邮箱已被注册。'
+        
+        if errors:
+             return Response({'status': 'error', 'errors': errors}, status=status.HTTP_400_BAD_REQUEST)
+
+        # --- Create User and Student Record (using raw SQL) --- 
+        with transaction.atomic(): # Keep transaction for atomicity
+            with connection.cursor() as cursor:
+                # Insert into Users table
+                cursor.execute("""
+                    INSERT INTO Users (username, email, password, first_name, last_name, user_type, profile_info)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                """, [username, email, password, first_name, last_name, user_type, profile_info])
+                
+                # Get the user_id of the newly inserted user
+                # Note: cursor.lastrowid is specific to some backends like MySQL for AUTO_INCREMENT
+                new_user_id = cursor.lastrowid 
+                if not new_user_id:
+                    # Fallback or error handling if lastrowid isn't supported/returned
+                    # Could query based on username/email if needed, but less reliable
+                     raise Exception("无法获取新用户的 ID。")
+
+                # Insert into Student table
+                cursor.execute("""
+                    INSERT INTO Student (student_id)
+                    VALUES (%s)
+                """, [new_user_id])
+
+        return Response({
+            'status': 'success',
+            'message': '注册成功！现在您可以登录了。',
+            'user_id': new_user_id 
+        }, status=status.HTTP_201_CREATED)
+
+    except IntegrityError as e:
+        # Handles potential DB constraint violations (e.g., unique key)
+        print(f"Integrity Error during signup: {e}")
+        # Check the error message to be more specific if possible
+        err_msg = str(e).lower()
+        if 'username' in err_msg:
+             errors['username'] = '用户名已被注册 (database constraint)。'
+        elif 'email' in err_msg:
+            errors['email'] = '邮箱已被注册 (database constraint)。'
+        else: 
+             errors['database'] = '注册失败，数据约束冲突。'
+        return Response({'status': 'error', 'errors': errors}, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        print(f"Error during signup: {e}")
+        return Response({'status': 'error', 'message': f'注册过程中发生错误: {e}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(['POST'])
@@ -180,19 +271,18 @@ def messages_api(request):
                 'status': 'error',
                 'message': '接收者ID和消息内容不能为空'
             }, status=status.HTTP_400_BAD_REQUEST)
-            
+        
         # 验证接收者是否存在
         with connection.cursor() as cursor:
             cursor.execute("SELECT user_id FROM Users WHERE user_id = %s", [receiver_id])
             receiver = cursor.fetchone()
-            
             if not receiver:
                 return Response({
                     'status': 'error',
                     'message': '接收者不存在'
                 }, status=status.HTTP_404_NOT_FOUND)
   
-
+            print("❎")
             with transaction.atomic():
                 
                 cursor.execute("""

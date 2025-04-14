@@ -27,9 +27,15 @@ db.sqlite3
 # macOS 文件
 .DS_Store
 
+
 # 静态资源收集
 /staticfiles/
 
 # GCP/部署文件（按需忽略）
 .gcloudignore
 app.yaml
+
+deploy-backend-auto.sh.env.production.firebase.firebaserc.gitignore
+deploy.shcheck-jquery.sh
+firebase.json
+dist
