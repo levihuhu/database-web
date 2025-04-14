@@ -15,6 +15,7 @@ import {
   Popconfirm,
   Space,
   Tooltip,
+  Tag,
 } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, ExclamationCircleOutlined, SearchOutlined, FilterOutlined, DatabaseOutlined, TeamOutlined } from '@ant-design/icons';
 import { Link } from 'react-router-dom';
@@ -22,7 +23,7 @@ import { debounce } from 'lodash';
 // 你已有的 axios 实例
 import apiClient from '../../services/api';
 
-const { Title, Text } = Typography;
+const { Title, Text, Paragraph } = Typography;
 const { Option } = Select;
 
 /**
@@ -169,7 +170,7 @@ export default function InstructorCourseManage() {
           </Button>
         </Col>
         <Col>
-          <Space>
+          <Space wrap>
             <Input
               placeholder="Search Courses..."
               prefix={<SearchOutlined />}
@@ -182,6 +183,7 @@ export default function InstructorCourseManage() {
               allowClear
               style={{ width: 120 }}
               onChange={(value) => handleFilterChange({ term: value })}
+              value={filters.term}
             >
               <Option value="Spring">Spring</Option>
               <Option value="Summer">Summer</Option>
@@ -192,6 +194,7 @@ export default function InstructorCourseManage() {
               allowClear
               style={{ width: 120 }}
               onChange={(value) => handleFilterChange({ state: value })}
+              value={filters.state}
             >
               <Option value="active">Active</Option>
               <Option value="completed">Completed</Option>
@@ -202,74 +205,77 @@ export default function InstructorCourseManage() {
       </Row>
 
       {loading ? (
-        <Spin size="large" />
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '300px' }}>
+          <Spin size="large" />
+        </div>
       ) : courses.length === 0 ? (
-        <Empty description="No courses found." />
+        <Empty description="No courses match your criteria." style={{ marginTop: 40 }} />
       ) : (
         <Row gutter={[16, 16]}>
           {courses.map((course) => (
             <Col xs={24} sm={12} md={8} lg={8} key={course.course_id}>
               <Card
-                title={
-                  <div style={{ color: '#096dd9', fontWeight: 600 }}>
-                    {course.course_name}
-                  </div>
-                }
-                bordered={false}
+                hoverable
                 style={{
-                  borderRadius: '10px',
-                  boxShadow: '0 4px 4px 4px rgba(0, 0, 0, 0.06)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  height: '100%',
                   minHeight: '300px',
                 }}
+                bodyStyle={{ flexGrow: 1, display: 'flex', flexDirection: 'column', padding: '16px' }}
                 actions={[
                   <Tooltip title="View Modules">
                     <Link to={`/teacher/courses/${course.course_id}/modules`}>
-                      <Button size="small" icon={<DatabaseOutlined />} />
+                      <Button type="text" icon={<DatabaseOutlined />} />
                     </Link>
                   </Tooltip>,
                   <Tooltip title="View Students">
                     <Link to={`/teacher/courses/${course.course_id}/students`}>
-                      <Button size="small" icon={<TeamOutlined />} />
+                      <Button type="text" icon={<TeamOutlined />} />
                     </Link>
                   </Tooltip>,
                   <Tooltip title="Edit Course">
-                    <Button icon={<EditOutlined />} size="small" onClick={() => handleEditCourse(course)} />
+                    <Button type="text" icon={<EditOutlined />} onClick={() => handleEditCourse(course)} />
                   </Tooltip>,
                   <Popconfirm
-                    title="Are you sure to delete this course?"
+                    title="Delete Course?"
+                    description={`Are you sure you want to delete "${course.course_name}"? This action might be irreversible.`}
                     icon={<ExclamationCircleOutlined style={{ color: 'red' }} />}
                     onConfirm={() => handleDeleteCourse(course)}
-                    okText="Yes"
+                    okText="Yes, Delete"
                     cancelText="No"
                   >
                     <Tooltip title="Delete Course">
-                      <Button icon={<DeleteOutlined />} size="small" danger />
+                      <Button type="text" danger icon={<DeleteOutlined />} />
                     </Tooltip>
                   </Popconfirm>,
                 ]}
               >
-                <Row gutter={[8, 6]} style={{ minHeight: '160px' }}>
-                  <Col span={12}>
-                    <Text type="secondary">Code: {course.course_code}</Text>
-                  </Col>
-                  <Col span={12}>
-                    <Text>Year: {course.year}</Text>
-                  </Col>
-
-                  <Col span={12}>
-                    <Text>Term: {course.term}</Text>
-                  </Col>
-                  <Col span={12}>
-                    <Text>Status: {course.state}</Text>
-                  </Col>
-
-                  <Col span={12}>
-                    <Text>Enrolled: {course.enrolled_students}</Text>
-                  </Col>
-                  <Col span={24}>
-                    <Text type="secondary">{course.course_description}</Text>
-                  </Col>
-                </Row>
+                <Card.Meta
+                   style={{ flexGrow: 1, display: 'flex', flexDirection: 'column' }}
+                   title={
+                     <div style={{ flexShrink: 0, marginBottom: 8 }}>
+                       <Paragraph ellipsis={{ rows: 2, tooltip: course.course_name }} style={{ fontWeight: 'bold', minHeight: '44px' }}>
+                         {course.course_name}
+                       </Paragraph>
+                       <Space wrap size={[4, 4]}>
+                         <Tag color="blue">{course.course_code}</Tag>
+                         <Tag>{course.year} {course.term}</Tag>
+                         <Tag>{course.state}</Tag>
+                       </Space>
+                     </div>
+                   }
+                   description={
+                     <div style={{ flexGrow: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                       <Paragraph ellipsis={{ rows: 3, tooltip: course.course_description }} style={{ marginBottom: 'auto', minHeight: '66px' }}>
+                         {course.course_description || 'No description provided.'}
+                       </Paragraph>
+                       <div style={{ flexShrink: 0, marginTop: 10 }}>
+                         <Text type="secondary">Enrolled Students: {course.enrolled_students ?? 0}</Text>
+                       </div>
+                     </div>
+                   }
+                />
               </Card>
             </Col>
           ))}
@@ -283,14 +289,15 @@ export default function InstructorCourseManage() {
         onOk={handleModalOk}
         onCancel={handleModalCancel}
         destroyOnClose
+        confirmLoading={loading}
       >
-        <Form form={form} layout="vertical">
+        <Form form={form} layout="vertical" initialValues={{ state: 'active' }}>
           <Form.Item
             name="course_name"
             label="Course Name"
             rules={[{ required: true, message: 'Please enter a course name' }]}
           >
-            <Input />
+            <Input placeholder="e.g., Introduction to Databases" />
           </Form.Item>
 
           <Form.Item
@@ -298,23 +305,26 @@ export default function InstructorCourseManage() {
             label="Course Code"
             rules={[{ required: true, message: 'Please enter a course code' }]}
           >
-            <Input />
+            <Input placeholder="e.g., CS5200" />
           </Form.Item>
 
           <Form.Item
             name="year"
             label="Year"
-            rules={[{ required: true, message: 'Please enter a year' }]}
+            rules={[
+              { required: true, message: 'Please enter a year' },
+              { type: 'number', min: 2020, max: 2050, message: 'Please enter a valid year', transform: value => Number(value) }
+            ]}
           >
-            <Input type="number" />
+            <Input type="number" placeholder="e.g., 2024" />
           </Form.Item>
 
           <Form.Item
             name="term"
             label="Term"
-            rules={[{ required: true, message: 'Please enter term' }]}
+            rules={[{ required: true, message: 'Please select a term' }]}
           >
-            <Select>
+            <Select placeholder="Select term">
               <Option value="Spring">Spring</Option>
               <Option value="Summer">Summer</Option>
               <Option value="Fall">Fall</Option>
@@ -326,12 +336,20 @@ export default function InstructorCourseManage() {
             label="State"
             rules={[{ required: true, message: 'Please select a state' }]}
           >
-            <Select>
+            <Select placeholder="Select course state">
               <Option value="active">Active</Option>
               <Option value="completed">Completed</Option>
               <Option value="archived">Archived</Option>
             </Select>
           </Form.Item>
+          
+          <Form.Item
+            name="course_description"
+            label="Description (Optional)"
+          >
+            <Input.TextArea rows={3} placeholder="Enter a brief description of the course" />
+          </Form.Item>
+
         </Form>
       </Modal>
     </div>

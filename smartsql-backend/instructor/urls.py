@@ -24,7 +24,7 @@ urlpatterns = [
 
     # --- Student Management (New Endpoints) ---
     path('api/instructor/students/', views.instructor_students, name='instructor_students_list'), # GET students enrolled in instructor's courses
-    # path('api/instructor/students/<int:student_id>/', views.instructor_student_detail, name='instructor_student_detail'), # Optional: Detail view if needed beyond profile
+    path('api/instructor/my-students/', views.instructor_get_my_students, name='instructor_get_my_students'), # New route for student list
     path('api/instructor/dashboard/', views.instructor_dashboard_data, name='instructor_dashboard_data'),
 
     # --- Add URL for score update ---

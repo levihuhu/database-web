@@ -207,16 +207,6 @@ INSERT INTO Student_Exercise (id, student_id, exercise_id, submitted_answer, is_
 (6, 1, 6, 'SELECT COUNT(*) FROM courses;', TRUE, '2025-04-06 16:00:00');
 
 
--- Knowledge_Graph table
-INSERT INTO Knowledge_Graph (graph_id, student_id, weak_areas, suggestions) VALUES
-(1, 1, 'Normalization, Indexing', 'Review textbook chapters on normalization and indexing.'),
-(2, 2, 'Foreign Keys', 'joining tables'),
-(3, 3, 'Stored Procedures', 'stored procedures.'),
-(4, 4, 'Triggers', 'trigger syntax'),
-(5, 5, 'Views', 'Explore use cases.'),
-(6, 10, 'SQL Optimization', 'query optimization techniques.'),
-(7, 1, 'Error Handling', 'triggers and procedures.');
-
 -- Student_Progress table
 INSERT INTO Student_Progress (progress_id, student_id, course_id, completed_questions, accuracy_rate, learning_goals) VALUES
 (1, 1, 1, 18, 95.50, 'normalization and indexing'),

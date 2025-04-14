@@ -13,6 +13,8 @@ from django.db import connection, transaction
 from rest_framework.response import Response
 from rest_framework import status
 import json
+from openai import OpenAI, OpenAIError, APIError
+from django.conf import settings
 
 # Create your views here.
 @api_view(['POST'])
@@ -66,9 +68,10 @@ def dynamic_sql_query_api(request):
         }, status=status.HTTP_200_OK)
             
     except Exception as e:
+        print(f"❌ Error in dynamic_sql_query_api: {str(e)}") 
         return Response({
             'status': 'error',
-            'message': str(e)
+            'message': 'An internal server error occurred.'
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -115,10 +118,10 @@ def student_courses_api(request):
         }, status=status.HTTP_200_OK)
 
     except Exception as e:
-        print("❌ 查询学生课程列表出错：", str(e))
+        print("❌ Error querying student courses list:", str(e))
         return Response({
             "status": "error",
-            "message": "获取课程列表失败"
+            "message": "Failed to retrieve course list."
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 @api_view(['GET'])
@@ -138,7 +141,7 @@ def course_modules_api(request, course_id):
             if not cursor.fetchone():
                 return Response({
                     'status': 'error',
-                    'message': '您未注册此课程'
+                    'message': 'You are not enrolled in this course.'
                 }, status=status.HTTP_403_FORBIDDEN)
                 
             # 获取课程信息
@@ -160,7 +163,7 @@ def course_modules_api(request, course_id):
 
             course_row = cursor.fetchone()
             if not course_row:
-                return Response({'status':'error', 'message':'课程不存在'}, status=status.HTTP_404_NOT_FOUND)
+                return Response({'status':'error', 'message':'Course not found.'}, status=status.HTTP_404_NOT_FOUND)
             course_columns = [col[0] for col in cursor.description]
             course = dict(zip(course_columns, course_row))
             
@@ -207,52 +210,12 @@ def course_modules_api(request, course_id):
         }, status=status.HTTP_200_OK)
             
     except Exception as e:
+        print(f"❌ Error in course_modules_api: {str(e)}")
         return Response({
             'status': 'error',
-            'message': str(e)
+            'message': 'An internal server error occurred while fetching module data.'
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-
-@api_view(['POST'])
-@authentication_classes([CustomJWTAuthentication])
-@permission_classes([IsAuthenticated])
-def accept_all_courses_api(request):
-    try:
-        # 获取当前登录的学生ID
-        student_id = request.user.user_id
-        
-        # 获取所有可用的课程
-        with connection.cursor() as cursor:
-            cursor.execute("""
-                SELECT c.course_id
-                FROM Course c
-                WHERE c.state = 'active'
-                AND c.course_id NOT IN (
-                    SELECT course_id 
-                    FROM Enrollment 
-                    WHERE student_id = %s AND status = 'enrolled'
-                )
-            """, [student_id])
-            
-            available_courses = [row[0] for row in cursor.fetchall()]
-            
-            # 为每个可用课程创建注册记录
-            for course_id in available_courses:
-                cursor.execute("""
-                    INSERT INTO Enrollment (student_id, course_id, status)
-                    VALUES (%s, %s, 'enrolled')
-                """, [student_id, course_id])
-                
-        return Response({
-            'status': 'success',
-            'message': f'成功注册了 {len(available_courses)} 门课程'
-        }, status=status.HTTP_200_OK)
-            
-    except Exception as e:
-        return Response({
-            'status': 'error',
-            'message': str(e)
-        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 @api_view(['GET'])
 @authentication_classes([CustomJWTAuthentication])
@@ -269,7 +232,7 @@ def module_exercises_api(request, course_id, module_id):
                 WHERE student_id = %s AND course_id = %s AND status = 'enrolled'
             """, [student_id, course_id])
             if cursor.fetchone()[0] == 0:
-                return Response({'error': '未注册该课程'}, status=status.HTTP_403_FORBIDDEN)
+                return Response({'error': 'Not enrolled in this course.'}, status=status.HTTP_403_FORBIDDEN)
 
         # 获取模块和课程信息
         with connection.cursor() as cursor:
@@ -283,7 +246,7 @@ def module_exercises_api(request, course_id, module_id):
             
             module_info = cursor.fetchone()
             if not module_info:
-                return Response({'error': '模块未找到'}, status=status.HTTP_404_NOT_FOUND)
+                return Response({'error': 'Module not found.'}, status=status.HTTP_404_NOT_FOUND)
             
             module = {
                 'module_id': module_info[0],
@@ -306,16 +269,19 @@ def module_exercises_api(request, course_id, module_id):
                     e.expected_answer,
                     CASE WHEN se.exercise_id IS NOT NULL THEN 1 ELSE 0 END AS completed
                 FROM Exercise e
-                JOIN Module_Exercise me ON e.exercise_id = me.exercise_id
+                JOIN Module_Exercise me 
+                ON e.exercise_id = me.exercise_id
                 LEFT JOIN (
-                    SELECT exercise_id 
+                    -- 只选出"答对(is_correct=TRUE或=1)"的记录
+                    SELECT exercise_id
                     FROM Student_Exercise 
-                    WHERE student_id = %s
+                    WHERE student_id = %s 
+                    AND is_correct = 1    -- 或 is_correct = TRUE，看你的存储类型而定
                     GROUP BY exercise_id
-                ) se ON e.exercise_id = se.exercise_id
+                ) se 
+                ON e.exercise_id = se.exercise_id
                 WHERE me.module_id = %s
                 ORDER BY me.display_order
-
             """, [student_id, module_id])
             
             columns = [col[0] for col in cursor.description]
@@ -330,7 +296,7 @@ def module_exercises_api(request, course_id, module_id):
                         exercise['table_schema'] = []
                 else:
                     exercise['table_schema'] = []
-
+        
         return Response({
             'status': 'success',
             'data': {
@@ -340,10 +306,13 @@ def module_exercises_api(request, course_id, module_id):
         })
 
     except Exception as e:
+        print(f"❌ Error in module_exercises_api: {str(e)}")
         return Response({
-            'error': '获取练习失败',
+            'error': 'Failed to retrieve exercises for this module.',
             'details': str(e)
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+
 
 @api_view(['POST'])
 @authentication_classes([CustomJWTAuthentication])
@@ -351,16 +320,15 @@ def module_exercises_api(request, course_id, module_id):
 def submit_exercise_api(request, exercise_id):
     try:
         student_id = request.user.user_id
-        answer = request.data.get('answer')
-        
-        if not answer:
-            return Response({'status': 'error', 'message': '请提供答案'}, status=status.HTTP_400_BAD_REQUEST)
+        student_answer = request.data.get('answer')
 
-        # 获取练习信息并验证权限
+        if not student_answer:
+            return Response({'status': 'error', 'message': 'Please provide an answer.'}, status=status.HTTP_400_BAD_REQUEST)
+
         with connection.cursor() as cursor:
-            # 获取练习的正确答案和关联的课程ID
+            # Get exercise details needed for validation and grading
             cursor.execute("""
-                SELECT e.expected_answer, m.course_id 
+                SELECT e.expected_answer, e.table_schema, m.course_id 
                 FROM Exercise e
                 LEFT JOIN Module_Exercise me ON e.exercise_id = me.exercise_id
                 LEFT JOIN Module m ON me.module_id = m.module_id
@@ -368,56 +336,136 @@ def submit_exercise_api(request, exercise_id):
             """, [exercise_id])
             result = cursor.fetchone()
             if not result:
-                return Response({'status': 'error', 'message': '练习未找到'}, status=status.HTTP_404_NOT_FOUND)
+                return Response({'status': 'error', 'message': 'Exercise not found.'}, status=status.HTTP_404_NOT_FOUND)
             
-            expected_answer = result[0]
-            course_id_associated_with_exercise = result[1]
+            expected_answer, table_schema_json, course_id_associated_with_exercise = result
 
-            # --- Permission Check --- 
-            if course_id_associated_with_exercise:
-                cursor.execute("""
-                    SELECT COUNT(*) FROM Enrollment
-                    WHERE student_id = %s AND course_id = %s AND status = 'enrolled'
-                """, [student_id, course_id_associated_with_exercise])
-                if cursor.fetchone()[0] == 0:
-                    # 如果练习有关联课程，但学生未注册，则拒绝提交
-                    return Response({
-                        'status': 'error',
-                        'message': '您未注册包含此练习的课程，无法提交答案'
-                    }, status=status.HTTP_403_FORBIDDEN)
-            # else:
-                # 如果练习没有关联课程，假设允许所有登录学生提交 (或根据您的业务逻辑调整)
-                # pass
+            # # Permission Check (unchanged)
+            # if course_id_associated_with_exercise:
+            #     cursor.execute("""
+            #         SELECT COUNT(*) FROM Enrollment
+            #         WHERE student_id = %s AND course_id = %s AND status = 'enrolled'
+            #     """, [student_id, course_id_associated_with_exercise])
+            #     if cursor.fetchone()[0] == 0:
+            #         return Response({
+            #             'status': 'error',
+            #             'message': '您未注册包含此练习的课程，无法提交答案'
+            #         }, status=status.HTTP_403_FORBIDDEN)
+            
+            # --- AI Grading Logic --- 
+            is_correct = False
+            score = 0.0
+            ai_feedback = "AI grading disabled or encountered an error."
 
-            # 检查答案是否正确
-            # 建议使用更健壮的SQL比较方式
-            is_correct = answer.strip().lower() == expected_answer.strip().lower()
-            score = 100.0 if is_correct else 0.0
+            if OPENAI_ENABLED and client:
+                try:
+                    table_schema_str = json.dumps(json.loads(table_schema_json), indent=2) if table_schema_json else "No schema provided."
+                except json.JSONDecodeError:
+                    table_schema_str = "Error parsing table schema."
+                    
+                grading_prompt = f"""
+You are an expert SQL evaluator. Compare the Student's SQL Query with the Expected SQL Query based on the provided Table Schema. 
+Determine if the Student's Query is logically equivalent to the Expected Query (produces the same result set, ignoring order unless ORDER BY is present in Expected Query). Ignore differences in formatting, aliases, or comments.
 
+Table Schema:
+```json
+{table_schema_str}
+```
+
+Expected SQL Query:
+```sql
+{expected_answer}
+```
+
+Student's SQL Query:
+```sql
+{student_answer}
+```
+
+Output your evaluation in JSON format with two keys:
+1.  "is_correct": boolean (true if logically equivalent, false otherwise).
+2.  "score": integer (100 for correct, 0 for incorrect).
+3.  "feedback": string (Provide a brief explanation for your reasoning, especially if incorrect).
+
+Example Response:
+{{"is_correct": true, "score": 100, "feedback": "Student's query is logically equivalent to the expected answer."}}
+OR
+{{"is_correct": false, "score": 0, "feedback": "Student's query uses an incorrect join condition, leading to different results."}}
+"""
+                
+                try:
+                    print("Sending grading request to OpenAI...")
+                    completion = client.chat.completions.create(
+                        model="gpt-4o", # Or a model suitable for code analysis
+                        messages=[{"role": "user", "content": grading_prompt}],
+                        response_format={ "type": "json_object" }, # Request JSON output
+                        temperature=0.1, # Low temperature for deterministic grading
+                        max_tokens=150
+                    )
+                    
+                    ai_response_content = completion.choices[0].message.content
+                    print(f"AI Grading Response: {ai_response_content}")
+                    
+                    # Parse the JSON response from AI
+                    grading_result = json.loads(ai_response_content)
+                    is_correct = grading_result.get('is_correct', False)
+                    score = float(grading_result.get('score', 0.0))
+                    ai_feedback = grading_result.get('feedback', 'No feedback provided by AI.')
+
+                except (APIError, OpenAIError) as ai_error:
+                    print(f"❌ OpenAI API error during grading: {ai_error}")
+                    ai_feedback = f"AI grading failed due to API error: {ai_error}"
+                except json.JSONDecodeError:
+                    print(f"❌ Failed to parse AI grading JSON response: {ai_response_content}")
+                    ai_feedback = "AI grading failed: Could not understand the AI's response format."
+                except Exception as e:
+                    print(f"❌ Unexpected error during AI grading: {e}")
+                    ai_feedback = f"AI grading failed due to an unexpected error: {e}"
+            else:
+                 # Fallback to simple string comparison if AI is disabled
+                 is_correct = student_answer.strip().lower() == expected_answer.strip().lower()
+                 score = 100.0 if is_correct else 0.0
+                 ai_feedback = "AI grading is disabled. Used basic string comparison." # Indicate fallback
+                 print("AI Grading Disabled - Using simple string comparison.")
+            # --- End AI Grading Logic ---
+            print("👌🏻22222")
+            # Save submission result
             with transaction.atomic():
-                cursor.execute("""
-                    INSERT INTO Student_Exercise (student_id, exercise_id, submitted_answer, is_correct, completed_at)
-                    VALUES (%s, %s, %s, %s, NOW())
+                sql_insert = """
+                    INSERT INTO Student_Exercise (student_id, exercise_id, submitted_answer, is_correct, score, completed_at, ai_feedback)
+                    VALUES (%s, %s, %s, %s, %s, NOW(), %s)
                     ON DUPLICATE KEY UPDATE 
                         submitted_answer = VALUES(submitted_answer),
                         is_correct = VALUES(is_correct),
-                        completed_at = NOW()
-                """, [student_id, exercise_id, answer, is_correct])
-        # 返回成功响应
+                        score = VALUES(score),
+                        completed_at = NOW(),
+                        ai_feedback = VALUES(ai_feedback)
+                """
+                params = [student_id, exercise_id, student_answer, is_correct, score, ai_feedback]
+                try:
+                    cursor.execute(sql_insert, params)
+                    print(f"Successfully inserted/updated Student_Exercise for student {student_id}, exercise {exercise_id}")
+                except Exception as db_error:
+                    print(f"❌ DB Error during Student_Exercise save: {db_error}")
+                    print(f"SQL attempted: {cursor.mogrify(sql_insert, params)}") # Log the exact query with params
+                    raise # Re-raise the exception to trigger rollback and error response
+
+        # Return success response including AI feedback
         return Response({
             'status': 'success',
             'data': {
                 'is_correct': is_correct,
                 'score': score,
-                'message': '答案已提交'
+                'feedback': ai_feedback, # Send feedback to frontend
+                'message': 'Answer submitted and evaluated by AI.'
             }
         }, status=status.HTTP_200_OK)
 
     except Exception as e:
-        print(f"❌ 提交答案失败 (Exercise ID: {exercise_id}): {str(e)}")
+        print(f"❌ Error submitting answer (Exercise ID: {exercise_id}): {str(e)}")
         return Response({
             'status': 'error',
-            'message': '提交答案失败',
+            'message': 'Failed to submit answer.',
             'details': str(e)
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
@@ -584,8 +632,20 @@ def get_exercise_detail(request, exercise_id):
     try:
         student_id = request.user.user_id
         
-        # 获取练习详细信息，同时获取关联的课程和模块信息
         with connection.cursor() as cursor:
+            # Check if the student has submitted this exercise at least once
+            cursor.execute("""
+                SELECT COUNT(*) 
+                FROM Student_Exercise 
+                WHERE student_id = %s AND exercise_id = %s
+            """, [student_id, exercise_id])
+            submission_count = cursor.fetchone()[0]
+            can_view_answer = submission_count > 0
+            
+            # Dynamically build the SELECT clause for expected_answer
+            expected_answer_select_sql = "e.expected_answer" if can_view_answer else "NULL"
+            
+            # Fetch exercise details using the dynamically built clause
             cursor.execute("""
                 SELECT 
                     e.exercise_id, e.title, e.description, e.hint, 
@@ -605,29 +665,27 @@ def get_exercise_detail(request, exercise_id):
             result = cursor.fetchone()
             
             if not result:
-                return Response({'status': 'error', 'message': '练习未找到'}, status=status.HTTP_404_NOT_FOUND)
+                return Response({'status': 'error', 'message': 'Exercise not found.'}, status=status.HTTP_404_NOT_FOUND)
             
             exercise = dict(zip(columns, result))
+            print("👌🏻exercise", exercise)
             associated_course_id = exercise.get('course_id')
+            print("👌🏻associated_course_id", associated_course_id)
 
-            # --- Permission Check --- 
-            if associated_course_id:
-                cursor.execute("""
-                    SELECT COUNT(*) FROM Enrollment
-                    WHERE student_id = %s AND course_id = %s AND status = 'enrolled'
-                """, [student_id, associated_course_id])
-                if cursor.fetchone()[0] == 0:
-                    # 如果练习有关联课程，但学生未注册，则拒绝访问
-                    return Response({
-                        'status': 'error', 
-                        'message': '您未注册包含此练习的课程，无法访问'
-                    }, status=status.HTTP_403_FORBIDDEN)
-            # else: 
-                # 如果练习没有关联课程，假设允许所有登录学生访问 (或根据您的业务逻辑调整)
-                # pass
+            # # Permission Check
+            # if associated_course_id:
+            #     cursor.execute("""
+            #         SELECT COUNT(*) FROM Enrollment
+            #         WHERE student_id = %s AND course_id = %s AND status = 'enrolled'
+            #     """, [student_id, associated_course_id])
+            #     if cursor.fetchone()[0] == 0:
+            #         return Response({
+            #             'status': 'error', 
+            #             'message': 'You are not enrolled in the course containing this exercise and cannot access it.'
+            #         }, status=status.HTTP_403_FORBIDDEN)
              
-            # 处理 table_schema
-            if exercise['table_schema']:
+            # Process table_schema
+            if exercise.get('table_schema'):
                 try:
                     exercise['table_schema'] = json.loads(exercise['table_schema'])
                 except json.JSONDecodeError:
@@ -635,16 +693,19 @@ def get_exercise_detail(request, exercise_id):
             else:
                 exercise['table_schema'] = []
 
+            # Add flag to indicate if the answer can be viewed
+            exercise['can_view_answer'] = can_view_answer 
+
         return Response({
             'status': 'success',
             'data': exercise
         }, status=status.HTTP_200_OK)
 
     except Exception as e:
-        print(f"❌ 获取练习详情失败 (Exercise ID: {exercise_id}): {str(e)}")
+        print(f"❌ Error fetching exercise details (Exercise ID: {exercise_id}): {str(e)}")
         return Response({
             'status': 'error',
-            'message': '获取练习详情失败',
+            'message': 'Failed to get exercise details.',
             'details': str(e)
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
@@ -670,7 +731,7 @@ def student_dashboard_api(request):
             """, [student_id])
             user_info = cursor.fetchone()
             if not user_info:
-                return Response({'status': 'error', 'message': '用户信息不存在'}, status=status.HTTP_404_NOT_FOUND)
+                return Response({'status': 'error', 'message': 'User information not found.'}, status=status.HTTP_404_NOT_FOUND)
             
             user_data = {
                 'first_name': user_info[0],
@@ -809,10 +870,10 @@ def student_dashboard_api(request):
         }, status=status.HTTP_200_OK)
             
     except Exception as e:
-        print("❌ 获取学生仪表盘数据出错：", str(e))
+        print("❌ Error fetching student dashboard data:", str(e))
         return Response({
             "status": "error",
-            "message": str(e)
+            "message": "Failed to retrieve dashboard data."
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 @api_view(['GET'])
@@ -858,10 +919,10 @@ def browse_all_courses_api(request):
         }, status=status.HTTP_200_OK)
 
     except Exception as e:
-        print("❌ 查询出错：", str(e))
+        print("❌ Error browsing all courses:", str(e))
         return Response({
             "status": "error",
-            "message": str(e)
+            "message": "An error occurred while fetching available courses."
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 @api_view(['POST'])
@@ -883,7 +944,7 @@ def enroll_course_api(request, course_id):
             if not cursor.fetchone():
                 return Response({
                     "status": "error",
-                    "message": "课程不存在或已结束"
+                    "message": "Course does not exist or is inactive."
                 }, status=status.HTTP_400_BAD_REQUEST)
                 
             # 检查学生是否已经注册该课程
@@ -896,7 +957,7 @@ def enroll_course_api(request, course_id):
             if cursor.fetchone():
                 return Response({
                     "status": "error",
-                    "message": "您已经注册了此课程"
+                    "message": "You are already enrolled in this course."
                 }, status=status.HTTP_400_BAD_REQUEST)
                 
             # 注册课程
@@ -907,14 +968,14 @@ def enroll_course_api(request, course_id):
 
         return Response({
             "status": "success",
-            "message": "课程注册成功"
+            "message": "Successfully enrolled in course."
         }, status=status.HTTP_200_OK)
 
     except Exception as e:
-        print("❌ 注册课程出错：", str(e))
+        print("❌ Error enrolling in course:", str(e))
         return Response({
             "status": "error",
-            "message": str(e)
+            "message": "An error occurred during enrollment."
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 @api_view(['GET'])
@@ -990,10 +1051,10 @@ def student_all_exercises_api(request):
         }, status=status.HTTP_200_OK)
             
     except Exception as e:
-        print("❌ 获取练习列表出错：", str(e))
+        print("❌ Error fetching exercise list:", str(e))
         return Response({
             "status": "error",
-            "message": str(e)
+            "message": "Failed to retrieve exercise list."
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 @api_view(['GET'])
@@ -1063,9 +1124,19 @@ def student_messages_api(request):
         }, status=status.HTTP_200_OK)
             
     except Exception as e:
-        print("❌ 获取学生消息列表出错：", str(e)) # Update error message
+        print("❌ Error fetching student messages:", str(e))
         return Response({
             "status": "error",
-            "message": "获取消息列表失败"
+            "message": "Failed to retrieve message list."
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+# Assume OpenAI client is initialized similarly to ai/views.py
+# It's better practice to initialize it once globally, e.g., in settings or apps.py
+try:
+    client = OpenAI(api_key=settings.OPENAI_API_KEY)
+    OPENAI_ENABLED = True
+except Exception as e:
+    print(f"Warning: OpenAI client could not be initialized in student/views.py: {e}")
+    client = None
+    OPENAI_ENABLED = False
 

@@ -10,7 +10,9 @@ import {
   Space,
   message,
   Popconfirm,
-  Empty
+  Empty,
+  Divider,
+  Spin
 } from 'antd';
 import {
   DatabaseOutlined,
@@ -24,7 +26,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import apiClient from '../../services/api';
 
-const { Title, Text } = Typography;
+const { Title, Text, Paragraph } = Typography;
 
 const StudentCourseList = () => {
   const [courses, setCourses] = useState([]);
@@ -39,10 +41,12 @@ const StudentCourseList = () => {
         setCourses(response.data.data);
       } else {
         message.error('Failed to fetch course data');
+        setCourses([]);
       }
     } catch (error) {
       console.error('Error fetching courses:', error);
       message.error('Failed to load courses');
+      setCourses([]);
     } finally {
       setLoading(false);
     }
@@ -76,105 +80,85 @@ const StudentCourseList = () => {
 
   if (loading) {
     return (
-        <div style={{
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          height: '100vh'
-        }}>
-          <LoadingOutlined style={{ fontSize: 48 }} />
-        </div>
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 'calc(100vh - 150px)' }}>
+        <Spin size="large" />
+      </div>
     );
   }
 
   return (
-      <div style={{ padding: '20px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-          <Title level={2}>My Courses</Title>
-          <Button 
-            type="primary" 
-            icon={<SearchOutlined />}
-            onClick={() => navigate('/student/browse-courses')}
-          >
-            Browse All Courses
-          </Button>
-        </div>
-        <Text type="secondary">Your enrolled courses</Text>
-
-        {courses.length === 0 ? (
-            <Empty
-                description="No courses enrolled yet"
-                style={{ marginTop: 40 }}
-            />
-        ) : (
-            <Row gutter={[16, 16]} style={{ marginTop: 20 }}>
-              {courses.map(course => (
-                  <Col span={8} key={course.course_id}>
-                    <Card
-                        hoverable
-                        onClick={() => navigate(`/student/courses/${course.course_id}`)}
-                        cover={
-                          <div style={{
-                            padding: '20px',
-                            background: '#f0f2f5',
-                            textAlign: 'center'
-                          }}>
-                            <DatabaseOutlined style={{ fontSize: '48px', color: '#1890ff' }} />
-                          </div>
-                        }
-                    >
-                      <Card.Meta
-                          title={
-                            <>
-                              <div style={{ whiteSpace: 'normal', wordBreak: 'break-word' }}>
-                                {course.course_name}
-                              </div>
-                              <div style={{ marginTop: 4 }}>
-                                {getStateTag(course.state)}
-                              </div>
-                            </>
-                          }
-                          description={
-                            <div>
-                              <Text type="secondary">{course.course_code}</Text>
-                              <div style={{ marginTop: 8 }}>
-                                <Text>{course.course_description}</Text>
-                              </div>
-                              {course.instructor_id && course.instructor_name && (
-                                <div style={{ marginTop: 8 }}>
-                                  <Text type="secondary">
-                                    Instructor: 
-                                    <a onClick={(e) => {
-                                      e.stopPropagation();
-                                      navigate(`/profile/?user_id=${course.instructor_id}`);
-                                    }}>
-                                      {course.instructor_name}
-                                    </a>
-                                  </Text>
-                                </div>
-                              )}
-                              <div style={{ marginTop: 16 }}>
-                                <Space>
-                                  <Tag icon={<BookOutlined />}>
-                                    {course.year} {getTermText(course.term)}
-                                  </Tag>
-                                </Space>
-                              </div>
-                              <div style={{ marginTop: 16 }}>
-                                <Space>
-                                  <Text type="secondary">Modules: {course.total_modules}</Text>
-                                  <Text type="secondary">Exercises: {course.total_exercises}</Text>
-                                </Space>
-                              </div>
-                            </div>
-                          }
-                      />
-                    </Card>
-                  </Col>
-              ))}
-            </Row>
-        )}
+    <div style={{ padding: '20px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+        <Title level={2} style={{ marginBottom: 0 }}>My Courses</Title>
+        <Button 
+          type="primary" 
+          icon={<SearchOutlined />}
+          onClick={() => navigate('/student/browse-courses')}
+        >
+          Browse All Courses
+        </Button>
       </div>
+      <Text type="secondary">Your enrolled courses</Text>
+
+      {courses.length === 0 ? (
+        <Empty
+          description="You are not enrolled in any courses yet."
+          style={{ marginTop: 60 }}
+        />
+      ) : (
+        <Row gutter={[16, 16]}>
+          {courses.map(course => (
+            <Col xs={24} sm={12} md={8} key={course.course_id}>
+              <Card
+                hoverable
+                onClick={() => navigate(`/student/courses/${course.course_id}`)}
+                style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: '380px' }}
+                bodyStyle={{ flexGrow: 1, display: 'flex', flexDirection: 'column' }}
+              >
+                <div style={{ padding: '10px', background: '#f0f2f5', textAlign: 'center', marginBottom: '16px', flexShrink: 0 }}>
+                  <DatabaseOutlined style={{ fontSize: '48px', color: '#1890ff' }} />
+                </div>
+                <Card.Meta
+                  style={{ flexGrow: 1, display: 'flex', flexDirection: 'column' }}
+                  title={
+                    <div style={{ marginBottom: 8, flexShrink: 0 }}>
+                      <Paragraph ellipsis={{ rows: 2, tooltip: course.course_name }} style={{ marginBottom: 4, fontWeight: 'bold', minHeight: '44px' }}>
+                        {course.course_name}
+                      </Paragraph>
+                      <Space wrap size={[4, 4]}>
+                        <Tag color="blue">{course.course_code}</Tag>
+                        <Tag color="green">Enrolled</Tag>
+                      </Space>
+                    </div>
+                  }
+                  description={
+                    <div style={{ flexGrow: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                      <Paragraph ellipsis={{ rows: 3, tooltip: course.course_description || 'No description available' }} style={{ marginBottom: 'auto', minHeight: '66px' }}>
+                        {course.course_description || 'No description available'}
+                      </Paragraph>
+                      <div style={{ flexShrink: 0 }}>
+                        <Divider style={{ margin: '8px 0' }} />
+                        <Space direction="vertical" size={4} style={{ width: '100%' }}>
+                          <div>
+                            <Text type="secondary"><BookOutlined /> {course.year} {getTermText(course.term)}</Text>
+                          </div>
+                          <div>
+                            <Space wrap size={[8, 4]}>
+                              <Text type="secondary">Modules: {course.total_modules ?? 0}</Text>
+                              <Text type="secondary">Exercises: {course.total_exercises ?? 0}</Text>
+                            </Space>
+                          </div>
+                        </Space>
+                      </div>
+                    </div>
+                  }
+                />
+              </Card>
+            </Col>
+          ))}
+        </Row>
+      )}
+    </div>
   );
 };
 

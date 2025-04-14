@@ -51,10 +51,10 @@ export default function Profile() {
         }
 
       } else {
-        message.error(response.data.message || '获取用户数据失败');
+        message.error(response.data.message || 'Get user data failed');
       }
     } catch (error) {
-      message.error('获取用户数据失败');
+      message.error('Get user data failed');
       console.error(error);
     } finally {
       setLoading(false);
@@ -66,20 +66,20 @@ export default function Profile() {
       const response = await apiClient.put('/api/users/profile/update/', values);
       
       if (response.data.status === 'success') {
-        message.success('个人资料更新成功');
+        message.success('Update successfully');
         setEditing(false);
         fetchUserData();
       } else {
-        message.error(response.data.message || '更新失败');
+        message.error(response.data.message || 'Update failed');
       }
     } catch (error) {
-      message.error('更新失败: ' + (error.response?.data?.message || error.message));
+      message.error('Update failed: ' + (error.response?.data?.message || error.message));
     }
   };
   
   const handleSendMessage = async () => {
     if (!messageContent.trim()) {
-      message.warning('消息内容不能为空');
+      message.warning('Message content cannot be empty');
       return;
     }
     try {
@@ -87,11 +87,11 @@ export default function Profile() {
         receiver_id: targetUserId,
         content: messageContent
       });
-      message.success('消息发送成功');
+      message.success('Message sent successfully');
       setMessageModal(false);
       setMessageContent('');
     } catch (error) {
-      message.error('发送失败: ' + (error.response?.data?.message || error.message));
+      message.error('Send message failed: ' + (error.response?.data?.message || error.message));
     }
   };
   
@@ -109,18 +109,18 @@ export default function Profile() {
         }
       });
       setUser(prev => ({...prev, avatar_url: response.data.avatar_url}));
-      message.success('头像上传成功');
+      message.success('Avatar uploaded successfully');
     } catch (error) {
-      message.error('头像上传失败');
+      message.error('Avatar upload failed');
     }
   };
   
   if (loading) {
-    return <div style={{ textAlign: 'center', padding: '50px' }}>加载中...</div>;
+    return <div style={{ textAlign: 'center', padding: '50px' }}>Loading...</div>;
   }
   
   if (!user) {
-    return <div style={{ textAlign: 'center', padding: '50px' }}>未找到用户</div>;
+    return <div style={{ textAlign: 'center', padding: '50px' }}>User not found</div>;
   }
   
   return (
@@ -134,7 +134,7 @@ export default function Profile() {
               onClick={() => setEditing(true)}
               disabled={editing}
             >
-              编辑资料
+              Edit profile
             </Button>
           ) : (
             <Button 
@@ -142,7 +142,7 @@ export default function Profile() {
               icon={<MailOutlined />} 
               onClick={() => setMessageModal(true)}
             >
-              发送消息
+              Send message
             </Button>
           )}
         </div>
@@ -177,12 +177,12 @@ export default function Profile() {
           
           <Text type="secondary" style={{ display: 'block', marginBottom: '10px' }}>
             <EnvironmentOutlined style={{ marginRight: '5px' }} />
-            {user.user_type === 'Student' ? '学生' : '教师'}
+            {user.user_type === 'Student' ? 'Student' : 'Instructor'}
           </Text>
           
           {!editing && (
             <Paragraph style={{ maxWidth: '500px', margin: '0 auto 20px' }}>
-              {user.profile_info || '用户暂未填写个人简介'}
+              {user.profile_info || 'User has not filled in their profile information yet'}
             </Paragraph>
           )}
         </div>
@@ -194,29 +194,29 @@ export default function Profile() {
             onFinish={handleUpdate}
             style={{ maxWidth: '500px', margin: '0 auto' }}
           >
-            <Form.Item name="username" label="用户名">
+            <Form.Item name="username" label="Username">
               <Input disabled />
             </Form.Item>
             
-            <Form.Item name="email" label="邮箱">
+            <Form.Item name="email" label="Email">
               <Input disabled />
             </Form.Item>
             
-            <Form.Item name="user_type" label="用户类型">
+            <Form.Item name="user_type" label="User type">
               <Radio.Group disabled>
-                <Radio value="Student">学生</Radio>
-                <Radio value="Instructor">教师</Radio>
+                <Radio value="Student">Student</Radio>
+                <Radio value="Instructor">Instructor</Radio>
               </Radio.Group>
             </Form.Item>
             
-            <Form.Item name="profile_info" label="个人简介">
+            <Form.Item name="profile_info" label="Profile information">
               <TextArea rows={4} />
             </Form.Item>
             
             <Form.Item>
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-                <Button icon={<CloseOutlined />} onClick={() => setEditing(false)}>取消</Button>
-                <Button type="primary" htmlType="submit" icon={<SaveOutlined />}>保存</Button>
+                <Button icon={<CloseOutlined />} onClick={() => setEditing(false)}>Cancel</Button>
+                <Button type="primary" htmlType="submit" icon={<SaveOutlined />}>Save</Button>
               </div>
             </Form.Item>
           </Form>
@@ -228,29 +228,29 @@ export default function Profile() {
               <Row gutter={[0, 20]} style={{ textAlign: 'left' }}>
                 <Col span={24}>
                   <div style={{ display: 'flex' }}>
-                    <div style={{ flex: '0 0 100px', fontWeight: 'bold' }}>用户名：</div>
+                    <div style={{ flex: '0 0 100px', fontWeight: 'bold' }}>Username:</div>
                     <div>{user.username}</div>
                   </div>
                 </Col>
                 
                 <Col span={24}>
                   <div style={{ display: 'flex' }}>
-                    <div style={{ flex: '0 0 100px', fontWeight: 'bold' }}>姓名：</div>
+                    <div style={{ flex: '0 0 100px', fontWeight: 'bold' }}>Name:</div>
                     <div>{user.first_name} {user.last_name}</div>
                   </div>
                 </Col>
                 
                 <Col span={24}>
                   <div style={{ display: 'flex' }}>
-                    <div style={{ flex: '0 0 100px', fontWeight: 'bold' }}>邮箱：</div>
+                    <div style={{ flex: '0 0 100px', fontWeight: 'bold' }}>Email:</div>
                     <div>{user.email}</div>
                   </div>
                 </Col>
                 
                 <Col span={24}>
                   <div style={{ display: 'flex' }}>
-                    <div style={{ flex: '0 0 100px', fontWeight: 'bold' }}>用户类型：</div>
-                    <div>{user.user_type === 'Student' ? '学生' : '教师'}</div>
+                    <div style={{ flex: '0 0 100px', fontWeight: 'bold' }}>User type:</div>
+                    <div>{user.user_type === 'Student' ? 'Student' : 'Instructor'}</div>
                   </div>
                 </Col>
               </Row>
@@ -287,19 +287,19 @@ export default function Profile() {
       </Card>
       
       <Modal
-        title={`发送消息给 ${user?.first_name || ''} ${user?.last_name || ''}`}
+        title={`Send message to ${user?.first_name || ''} ${user?.last_name || ''}`}
         open={messageModal}
         onOk={handleSendMessage}
         onCancel={() => setMessageModal(false)}
-        okText="发送"
-        cancelText="取消"
+        okText="Send"
+        cancelText="Cancel"
         confirmLoading={loading}
       >
         <TextArea
           rows={4}
           value={messageContent}
           onChange={(e) => setMessageContent(e.target.value)}
-          placeholder="请输入消息内容..."
+          placeholder="Please enter message content..."
         />
       </Modal>
     </div>

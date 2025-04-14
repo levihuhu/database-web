@@ -15,7 +15,7 @@ import {
   DatabaseOutlined,
   OrderedListOutlined
 } from '@ant-design/icons';
-import InstructorAIChatbot from '../InstructorAIChatbot';
+import ChatWidget from '../common/ChatWidget';
 
 const { Header, Sider, Content } = Layout;
 const { Title, Text } = Typography;
@@ -161,7 +161,7 @@ const TeacherLayout = () => {
         >
           <Outlet />
         </Content>
-        <InstructorAIChatbot />
+        <ChatWidget />
       </Layout>
     </Layout>
   );
