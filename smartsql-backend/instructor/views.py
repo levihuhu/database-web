@@ -389,9 +389,14 @@ def instructor_exercises_by_module(request, module_id):
     if not is_owner: return error_response
 
     with connection.cursor() as cursor:
-        cursor.execute(""" SELECT e.exercise_id, e.title, e.description, e.hint, e.expected_answer, e.difficulty, e.table_schema
-                         FROM Exercise e JOIN Module_Exercise me ON e.exercise_id = me.exercise_id
-                         WHERE me.module_id = %s ORDER BY e.title """, [module_id])
+        cursor.execute(""" SELECT * FROM Exercise
+                                WHERE exercise_id IN (
+                                    SELECT DISTINCT exercise_id
+                                    FROM Module_Exercise
+                                    WHERE module_id = %s
+                                )
+                                ORDER BY title
+                                """, [module_id])
         exercises = dictfetchall(cursor)
 
     result = [{
@@ -652,6 +657,39 @@ def instructor_students(request):
 
     return Response({'students': list(students_data.values())}) # Return the populated dictionary values as a list
 
+@api_view(['GET'])
+@authentication_classes([CustomJWTAuthentication])
+@permission_classes([IsAuthenticated])
+@safe_api_view
+def instructor_get_my_students(request):
+    """GET: A simple list of students (id, name) enrolled in the instructor's courses."""
+    user = request.user
+    instructor_id = user.user_id
+
+    if user.user_type != 'Instructor':
+        return Response({"error": "Permission Denied"}, status=status.HTTP_403_FORBIDDEN)
+
+    with connection.cursor() as cursor:
+        cursor.execute("""
+            SELECT DISTINCT u.user_id, u.username, u.first_name, u.last_name
+            FROM Users u
+            JOIN Enrollment e ON u.user_id = e.student_id
+            JOIN Course c ON e.course_id = c.course_id
+            WHERE c.instructor_id = %s AND e.status = 'enrolled' AND u.user_type = 'Student'
+            ORDER BY u.last_name, u.first_name
+        """, [instructor_id])
+        students = dictfetchall(cursor)
+        # Format for frontend select
+        student_list = [
+            {
+                "value": s['user_id'],
+                "label": f"{s['first_name']} {s['last_name']} ({s['username']})"
+            }
+            for s in students
+        ]
+
+    return Response({'students': student_list})
+
 # === Dashboard View ===
 @api_view(['GET'])
 @authentication_classes([CustomJWTAuthentication])
@@ -716,41 +754,51 @@ def instructor_dashboard_data(request):
 @permission_classes([IsAuthenticated])
 @safe_api_view
 def instructor_messages_api(request):
-    """GET: Fetch messages received by instructor. POST: Send a new message (private or announcement)."""
+    """GET: Fetch messages involving the instructor (sent or received). POST: Send a new message."""
     instructor_id = request.user.user_id
 
     if request.method == 'GET':
         search_term = request.query_params.get('search', '')
-        
+
         with connection.cursor() as cursor:
-            # Fetch private messages received and announcements sent by this instructor
+            # Fetch private messages involving this instructor (sent OR received)
+            # and announcements sent by this instructor
             query = """
-                -- Received Private Messages
-                SELECT 
+                -- Private Messages (Sent OR Received)
+                SELECT
                     m.message_id,
                     m.sender_id,
                     u_sender.first_name as sender_first_name,
                     u_sender.last_name as sender_last_name,
                     u_sender.username as sender_username,
+                    pm.receiver_id, -- Added receiver_id
+                    u_receiver.first_name as receiver_first_name, -- Added receiver name
+                    u_receiver.last_name as receiver_last_name,   -- Added receiver name
+                    u_receiver.username as receiver_username,   -- Added receiver username
                     m.message_content,
                     m.timestamp,
                     'private' as message_type_val,
-                    NULL as course_context_id, -- No course context for received private
+                    NULL as course_context_id,
                     NULL as course_context_name
                 FROM Message m
                 JOIN PrivateMessage pm ON m.message_id = pm.message_id
                 JOIN Users u_sender ON m.sender_id = u_sender.user_id
-                WHERE pm.receiver_id = %s
-                
+                JOIN Users u_receiver ON pm.receiver_id = u_receiver.user_id -- Join to get receiver details
+                WHERE m.sender_id = %s OR pm.receiver_id = %s -- Fetch if instructor is sender OR receiver
+
                 UNION ALL
-                
+
                 -- Sent Announcements (linked to courses taught by instructor)
-                SELECT 
+                SELECT
                     m.message_id,
                     m.sender_id, -- Sender is the instructor
                     u_sender.first_name as sender_first_name,
                     u_sender.last_name as sender_last_name,
                     u_sender.username as sender_username,
+                    NULL as receiver_id, -- No specific receiver for announcement
+                    NULL as receiver_first_name,
+                    NULL as receiver_last_name,
+                    NULL as receiver_username,
                     m.message_content,
                     m.timestamp,
                     'announcement' as message_type_val,
@@ -762,25 +810,35 @@ def instructor_messages_api(request):
                 JOIN Users u_sender ON m.sender_id = u_sender.user_id
                 WHERE m.sender_id = %s -- Only announcements sent by this instructor
             """
-            params = [instructor_id, instructor_id]
+            # Parameters updated for the OR condition and the second sender_id check
+            params = [instructor_id, instructor_id, instructor_id]
 
-            # Add search filter if provided
+            # Add search filter if provided - updated to search sender/receiver/content/course
             if search_term:
                  query += """ AND (
-                     m.message_content LIKE %s OR 
-                     u_sender.username LIKE %s OR 
-                     u_sender.first_name LIKE %s OR 
+                     m.message_content LIKE %s OR
+                     u_sender.username LIKE %s OR
+                     u_sender.first_name LIKE %s OR
                      u_sender.last_name LIKE %s OR
+                     u_receiver.username LIKE %s OR  -- Search receiver username
+                     u_receiver.first_name LIKE %s OR -- Search receiver first name
+                     u_receiver.last_name LIKE %s OR  -- Search receiver last name
                      c.course_name LIKE %s
                  ) """
-                 like = f"%{search_term}%"; params.extend([like] * 5)
+                 like = f"%{search_term}%"; params.extend([like] * 8) # Increased param count
 
             query += " ORDER BY timestamp DESC"
-            
+
             cursor.execute(query, params)
             messages = dictfetchall(cursor)
-            
-        return Response({'messages': messages})
+
+        # Process messages to add context for display (e.g., 'To: username' or 'From: username')
+        processed_messages = []
+        for msg in messages:
+            msg['is_sent_by_instructor'] = (msg['sender_id'] == instructor_id)
+            processed_messages.append(msg)
+
+        return Response({'messages': processed_messages}) # Return processed messages
 
     elif request.method == 'POST':
         data = request.data

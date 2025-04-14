@@ -15,7 +15,9 @@ import {
   Tag,
   Row,
   Col,
-  message
+  message,
+  Empty,
+  Result,
 } from 'antd';
 import { 
   CheckCircleOutlined, 
@@ -26,8 +28,10 @@ import {
   LeftOutlined,
   RightOutlined,
   InfoCircleOutlined,
-  TrophyOutlined
+  TrophyOutlined,
 } from '@ant-design/icons';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import apiClient from '../../services/api';
 
 const { Title, Paragraph, Text } = Typography;
@@ -37,73 +41,78 @@ const SQLExercise = () => {
   const { courseId, moduleId, exerciseId } = useParams();
   const navigate = useNavigate();
   const [userAnswer, setUserAnswer] = useState('');
-  const [feedback, setFeedback] = useState(null);
   const [loading, setLoading] = useState(true);
   const [exerciseData, setExerciseData] = useState(null);
-  const [isCorrect, setIsCorrect] = useState(null);
-  const [score, setScore] = useState(null);
+  const [showAnswer, setShowAnswer] = useState(false);
+  const [aiFeedback, setAiFeedback] = useState(null);
+  const [lastSubmission, setLastSubmission] = useState(null);
+  const [error, setError] = useState(null);
+  const [submitResult, setSubmitResult] = useState(null);
 
-  useEffect(() => {
-    const fetchExerciseDetails = async () => {
-      if (!exerciseId) return; 
+  // Define fetchExerciseDetails within the component scope
+  const fetchExerciseDetails = async () => {
+    if (!exerciseId) return; 
 
-      setLoading(true);
-      setFeedback(null);
-      setIsCorrect(null);
-      setScore(null);
-      setUserAnswer('');
+    setLoading(true);
+    setUserAnswer('');
 
-      try {
-        const response = await apiClient.get(`/api/student/exercises/${exerciseId}/`);
-        
-        if (response.data.status === 'success') {
-          let fetchedExercise = response.data.data;
+    try {
+      const response = await apiClient.get(`/api/student/exercises/${exerciseId}/`);
+      
+      if (response.data.status === 'success') {
+        let fetchedExercise = response.data.data;
 
-          let parsedSchema = [];
-          if (fetchedExercise.table_schema && typeof fetchedExercise.table_schema === 'string') {
-            try {
-              parsedSchema = JSON.parse(fetchedExercise.table_schema);
-              if (!Array.isArray(parsedSchema)) {
-                console.warn(`Parsed schema for exercise ${fetchedExercise.exercise_id} is not an array:`, parsedSchema);
-                parsedSchema = [];
-              }
-            } catch (e) {
-              console.error(`Failed to parse tableSchema for exercise ${fetchedExercise.exercise_id}:`, e);
+        let parsedSchema = [];
+        if (fetchedExercise.table_schema && typeof fetchedExercise.table_schema === 'string') {
+          try {
+            parsedSchema = JSON.parse(fetchedExercise.table_schema);
+            if (!Array.isArray(parsedSchema)) {
+              console.warn(`Parsed schema for exercise ${fetchedExercise.exercise_id} is not an array:`, parsedSchema);
               parsedSchema = [];
             }
-          } else if (Array.isArray(fetchedExercise.table_schema)) {
-            parsedSchema = fetchedExercise.table_schema;
+          } catch (e) {
+            console.error(`Failed to parse tableSchema for exercise ${fetchedExercise.exercise_id}:`, e);
+            parsedSchema = [];
           }
-          fetchedExercise.tableSchema = parsedSchema;
-
-          setExerciseData(fetchedExercise);
-        } else {
-          message.error(response.data.message || '获取练习详情失败');
-          setExerciseData(null);
+        } else if (Array.isArray(fetchedExercise.table_schema)) {
+          parsedSchema = fetchedExercise.table_schema;
         }
-      } catch (error) {
-        console.error('Failed to fetch exercise details:', error);
-        const errorMsg = error.response?.data?.message || '加载练习失败，请检查网络或稍后重试';
-        message.error(errorMsg);
-        setExerciseData(null);
-      } finally {
-        setLoading(false);
-      }
-    };
+        fetchedExercise.tableSchema = parsedSchema;
 
+        setExerciseData(fetchedExercise);
+        setLastSubmission({
+          completed: fetchedExercise.completed,
+          is_correct: fetchedExercise.is_correct,
+          score: fetchedExercise.score,
+          ai_feedback: fetchedExercise.ai_feedback
+        });
+      } else {
+        message.error(response.data.message || 'Failed to fetch exercise details');
+        setExerciseData(null);
+      }
+    } catch (error) {
+      console.error('Error fetching exercise details:', error);
+      const errorMsg = error.response?.data?.message || 'Failed to load exercise. Please check your network or try again later';
+      setError(errorMsg);
+      setExerciseData(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    // Call the defined function
     fetchExerciseDetails();
-  }, [exerciseId]);
+  }, [exerciseId]); // Dependency array remains
 
   const handleSubmit = async () => {
     if (!userAnswer.trim()) {
-      message.warning('请输入您的 SQL 答案');
+      message.warning('Please enter your SQL answer');
       return;
     }
     
     setLoading(true);
-    setFeedback(null);
-    setIsCorrect(null);
-    setScore(null);
+    setAiFeedback(null);
     
     try {
       const response = await apiClient.post(
@@ -111,24 +120,23 @@ const SQLExercise = () => {
         { answer: userAnswer }
       );
 
+      // Log the exact response data received by the frontend
+      console.log('Response data received from submit API:', response.data);
+
       if (response.data.status === 'success') {
         const result = response.data.data;
-        setIsCorrect(result.is_correct);
-        setScore(result.score);
-        const feedbackMsg = result.is_correct 
-                            ? (result.message || '回答正确！恭喜！') 
-                            : (result.message || '回答错误，请仔细检查 SQL 语句或逻辑。');
-        setFeedback(feedbackMsg);
-        message.success('答案已提交');
+        setAiFeedback(result);
+        message.success(result.message || 'Answer submitted and evaluated by AI.');
+        fetchExerciseDetails();
       } else {
-        const errorMsg = response.data.message || '提交失败，请稍后重试';
-        setFeedback(errorMsg);
+        const errorMsg = response.data.message || 'Submission failed, please try again later';
+        setAiFeedback({ feedback: errorMsg, is_correct: false, score: 0 });
         message.error(errorMsg);
       }
     } catch (error) {
-      console.error('Error submitting answer:', error);
-      const errorMsg = error.response?.data?.message || '提交时发生错误，请检查网络或联系管理员';
-      setFeedback(errorMsg);
+      console.error('Error submitting SQL:', error);
+      const errorMsg = error.response?.data?.message || 'An error occurred during submission. Please check your network or contact the administrator';
+      setAiFeedback({ feedback: errorMsg, is_correct: false, score: 0 });
       message.error(errorMsg);
     } finally {
       setLoading(false);
@@ -141,15 +149,16 @@ const SQLExercise = () => {
 
   if (!exerciseData) {
     return (
-      <div style={{ padding: '20px', textAlign: 'center' }}>
-        <Alert 
-          message="错误"
-          description="无法加载练习详情，请返回上一页重试。"
-          type="error" 
-          showIcon 
-        />
-        <Button style={{ marginTop: 16 }} onClick={() => navigate(-1)}>返回</Button>
-      </div>
+      <Empty
+        image={Empty.PRESENTED_IMAGE_SIMPLE}
+        description={(
+          <span>
+            {error || 'Could not load exercise details.'}
+          </span>
+        )}
+      >
+        <Button type="primary" onClick={() => navigate(-1)}>Go Back</Button>
+      </Empty>
     );
   }
 
@@ -264,23 +273,68 @@ const SQLExercise = () => {
           </Button>
         </Space>
 
-        {feedback && (
-          <Alert
-            message={isCorrect ? "Correct!" : "Incorrect"}
-            description={feedback}
-            type={isCorrect ? "success" : "error"}
+        {aiFeedback && (
+          <Alert 
+            message={<strong>Submission Result:</strong>}
+            description={
+              <>
+                <p>Status: {aiFeedback.is_correct ? 'Correct' : 'Incorrect'} (Score: {aiFeedback.score ?? 'N/A'})</p>
+                <p>Feedback: {aiFeedback.feedback}</p>
+              </>
+            }
+            type={aiFeedback.is_correct ? 'success' : 'error'}
             showIcon
-            style={{ marginTop: 16 }}
+            closable
+            onClose={() => setAiFeedback(null)}
+            style={{ marginBottom: '15px' }}
           />
         )}
-        {score !== null && (
-           <Alert
-            message={<Space><TrophyOutlined /> Score</Space>}
-            description={`Your score for this exercise: ${score}`}
-            type="info"
+        
+        {!aiFeedback && lastSubmission && lastSubmission.completed > 0 && (
+          <Alert 
+            message={<strong>Last Submission Status:</strong>}
+            description={
+              <>
+                <p>Status: {lastSubmission.is_correct ? 'Correct' : 'Incorrect'} (Score: {lastSubmission.score ?? 'N/A'})</p>
+                <p>Feedback: {lastSubmission.ai_feedback || 'N/A'}</p>
+              </>
+            }
+            type={lastSubmission.is_correct ? 'success' : 'warning'}
             showIcon
-            style={{ marginTop: 16 }}
-           />
+            style={{ marginBottom: '15px' }}
+          />
+        )}
+
+        {exerciseData.can_view_answer && (
+          <div style={{ marginTop: '20px' }}>
+            <Button onClick={() => setShowAnswer(!showAnswer)}>
+              {showAnswer ? 'Hide Answer' : 'View Expected Answer'}
+            </Button>
+            {showAnswer && (
+              <Card title="Expected Answer" size="small" style={{ marginTop: '10px' }}>
+                {console.log('Rendering expected answer. Value:', exerciseData?.expected_answer)}
+                <SyntaxHighlighter language="sql" style={oneDark}>
+                  {exerciseData.expected_answer || 'No answer provided.'}
+                </SyntaxHighlighter>
+              </Card>
+            )}
+          </div>
+        )}
+
+        {submitResult && (
+          <Result
+            status={submitResult.correct ? "success" : "error"}
+            title={submitResult.correct ? "Correct Answer" : "Incorrect Answer"}
+            subTitle={submitResult.feedback}
+            extra={[
+              !submitResult.correct && (
+                <Button type="primary" key="retry" onClick={() => setSubmitResult(null)}>
+                  Try Again
+                </Button>
+              ),
+              <Button key="back" onClick={() => navigate(-1)}>Go Back to Modules</Button>
+            ]}
+          />
         )}
 
       </Card>

@@ -23,13 +23,13 @@ import {
   LockOutlined,
   InfoCircleOutlined
 } from '@ant-design/icons';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, Link } from 'react-router-dom';
 import apiClient from '../../services/api';
 
-const { Title, Text } = Typography;
+const { Title, Text, Paragraph } = Typography;
 
 const ModuleExercises = () => {
-  const [module, setModule] = useState(null);
+  const [moduleInfo, setModuleInfo] = useState(null);
   const [exercises, setExercises] = useState([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
@@ -39,30 +39,32 @@ const ModuleExercises = () => {
     const fetchModuleData = async () => {
       try {
         setLoading(true);
-        const response = await apiClient.get(`/api/student/courses/${courseId}/modules/${moduleId}/exercises/`, {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem('access')}`
-          }
-        });
+        const response = await apiClient.get(`/api/student/courses/${courseId}/modules/${moduleId}/exercises/`);
         if (response.data.status === 'success') {
-          setModule(response.data.data.module);
+          setModuleInfo(response.data.data.module);
           setExercises(response.data.data.exercises);
         } else {
-          message.error('Failed to fetch module data');
+          message.error(response.data.message || 'Failed to fetch module data');
+          setModuleInfo(null);
+          setExercises([]);
         }
       } catch (error) {
         console.error('Error fetching module data:', error);
         message.error('Failed to load module data');
+        setModuleInfo(null);
+        setExercises([]);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchModuleData();
+    if (courseId && moduleId) {
+       fetchModuleData();
+    }
   }, [courseId, moduleId]);
 
   const getDifficultyTag = (difficulty) => {
-    switch(difficulty.toLowerCase()) {
+    switch(String(difficulty).toLowerCase()) {
       case 'easy':
         return <Tag color="green">Easy</Tag>;
       case 'medium':
@@ -76,129 +78,117 @@ const ModuleExercises = () => {
 
   const getStatusTag = (completed) => {
     return completed ? (
-        <Tag color="success" icon={<CheckCircleOutlined />}>Completed</Tag>
+      <Tag color="success" icon={<CheckCircleOutlined />}>Completed</Tag>
     ) : (
-        <Tag color="default">Incomplete</Tag>
+      <Tag color="default">Incomplete</Tag>
     );
   };
 
   const calculateModuleProgress = () => {
-    if (!exercises.length) return 0;
+    if (!exercises || exercises.length === 0) return 0;
     const completedCount = exercises.filter(ex => ex.completed).length;
     return Math.round((completedCount / exercises.length) * 100);
   };
 
   if (loading) {
     return (
-        <div style={{
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          height: '100vh'
-        }}>
-          <Spin size="large" />
-        </div>
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 'calc(100vh - 150px)' }}>
+        <Spin size="large" />
+      </div>
     );
   }
 
-  if (!module) {
+  if (!moduleInfo) {
     return (
-        <Empty
-            description="Module not found"
-            style={{ marginTop: 40 }}
-        />
+      <div style={{ padding: '20px' }}>
+        <Empty description="Module not found or failed to load." style={{ marginTop: 40 }} />
+        <Button onClick={() => navigate(`/student/courses/${courseId}`)} style={{ marginTop: 16 }}>
+          Back to Modules
+        </Button>
+      </div>
     );
   }
 
   const progress = calculateModuleProgress();
 
   return (
-      <div style={{ padding: '20px' }}>
-        <Breadcrumb
-            items={[
-              {
-                title: <HomeOutlined />,
-                onClick: () => navigate('/student'),
-              },
-              {
-                title: module.course_name,
-                onClick: () => navigate(`/student/course/${courseId}`),
-              },
-              {
-                title: module.module_name,
-              }
-            ]}
-            style={{ marginBottom: 20 }}
-        />
+    <div style={{ padding: '20px' }}>
+      <Breadcrumb
+        style={{ marginBottom: 16 }}
+        items={[
+          { title: <Link to='/student/courses'>My Courses</Link> },
+          { title: <Link to={`/student/courses/${courseId}`}>{moduleInfo.course_name || 'Course'}</Link> },
+          { title: moduleInfo.module_name },
+        ]}
+      />
 
-        <Card style={{ marginBottom: 20 }}>
-          <Title level={3}>{module.module_name}</Title>
-          <Text type="secondary">{module.course_code}</Text>
-          <div style={{ marginTop: 8 }}>
-            <Text>{module.module_description}</Text>
-          </div>
-          <div style={{ marginTop: 16 }}>
-            <Progress
-                percent={progress}
-                status={progress === 100 ? 'success' : 'active'}
-                format={percent => `${percent}%`}
-            />
-            <Text type="secondary" style={{ marginTop: 8, display: 'block' }}>
-              {exercises.filter(ex => ex.completed).length} of {exercises.length} exercises completed
-            </Text>
-          </div>
-        </Card>
+      <Card style={{ marginBottom: 20 }}>
+        <Title level={3} style={{ marginBottom: 5 }}>{moduleInfo.module_name}</Title>
+        <Paragraph type="secondary">{moduleInfo.module_description || 'No module description.'}</Paragraph>
+        <div style={{ marginTop: 16 }}>
+          <Text>Module Progress:</Text>
+          <Progress
+            percent={progress}
+            status={progress === 100 ? 'success' : 'active'}
+            format={percent => `${percent}%`}
+            style={{ margin: '8px 0' }}
+          />
+          <Text type="secondary" style={{ display: 'block' }}>
+            {exercises.filter(ex => ex.completed).length} of {exercises.length} exercises completed
+          </Text>
+        </div>
+      </Card>
 
-        <Title level={4}>Exercise List</Title>
-        <Text type="secondary">Select an exercise to begin</Text>
-
-        {exercises.length === 0 ? (
-            <Empty
-                description="No exercises available"
-                style={{ marginTop: 40 }}
-            />
-        ) : (
-            <Row gutter={[16, 16]} style={{ marginTop: 20 }}>
-              {exercises.map(exercise => (
-                  <Col span={8} key={exercise.exercise_id}>
-                    <Card
-                        hoverable
-                        onClick={() => navigate(`/student/courses/${courseId}/modules/${moduleId}/exercises/${exercise.exercise_id}`)}
-                        style={{
-                          cursor: 'pointer',
-                          border: exercise.completed ? '1px solid #52c41a' : '1px solid #d9d9d9'
-                        }}
-                    >
-                      <Card.Meta
-                          title={
-                            <Space>
-                              <span>{exercise.title}</span>
-                              {exercise.completed && <CheckCircleOutlined style={{ color: '#52c41a' }} />}
-                            </Space>
-                          }
-                          description={
-                            <div>
-                              <Text>{exercise.description}</Text>
-                              <div style={{ marginTop: 16 }}>
-                                <Space>
-                                  {getDifficultyTag(exercise.difficulty)}
-                                  {getStatusTag(exercise.completed)}
-                                  {exercise.hint && (
-                                      <Tooltip title={exercise.hint}>
-                                        <InfoCircleOutlined style={{ color: '#1890ff' }} />
-                                      </Tooltip>
-                                  )}
-                                </Space>
-                              </div>
-                            </div>
-                          }
-                      />
-                    </Card>
-                  </Col>
-              ))}
-            </Row>
-        )}
-      </div>
+      <Title level={4} style={{ marginTop: 30 }}>Exercises</Title>
+      {exercises.length === 0 ? (
+        <Empty description="No exercises available in this module yet." style={{ marginTop: 40 }} />
+      ) : (
+        <Row gutter={[16, 16]} style={{ marginTop: 20 }}>
+          {exercises.map(exercise => (
+            <Col xs={24} sm={12} md={8} key={exercise.exercise_id}>
+              <Card
+                hoverable
+                onClick={() => navigate(`/student/courses/${courseId}/modules/${moduleId}/exercises/${exercise.exercise_id}`)}
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  height: '100%',
+                  minHeight: '200px',
+                  borderLeft: exercise.completed ? '4px solid #52c41a' : '4px solid transparent',
+                }}
+                bodyStyle={{ flexGrow: 1, display: 'flex', flexDirection: 'column', padding: '16px' }}
+              >
+                <Card.Meta
+                  style={{ flexGrow: 1, display: 'flex', flexDirection: 'column' }}
+                  title={
+                    <div style={{ flexShrink: 0, marginBottom: 8 }}>
+                      <Paragraph ellipsis={{ rows: 2, tooltip: exercise.title }} style={{ fontWeight: 'bold', minHeight: '44px' }}>
+                        {exercise.title}
+                      </Paragraph>
+                    </div>
+                  }
+                  description={
+                    <div style={{ flexGrow: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                      <div style={{ flexShrink: 0, marginTop: 'auto' }}>
+                        <Space wrap size={[4, 4]}>
+                          {getDifficultyTag(exercise.difficulty)}
+                          {getStatusTag(exercise.completed)}
+                          {exercise.hint ? (
+                            <Tooltip title={exercise.hint}>
+                              <InfoCircleOutlined style={{ color: '#1890ff', cursor: 'help' }} />
+                            </Tooltip>
+                          ) : null}
+                        </Space>
+                      </div>
+                    </div>
+                  }
+                />
+              </Card>
+            </Col>
+          ))}
+        </Row>
+      )}
+    </div>
   );
 };
 

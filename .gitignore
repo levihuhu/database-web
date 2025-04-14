@@ -35,7 +35,8 @@ db.sqlite3
 .gcloudignore
 app.yaml
 
-deploy-backend-auto.sh.env.production.firebase.firebaserc.gitignore
-deploy.shcheck-jquery.sh
+deploy-backend-auto.sh.env.production.firebase.firebaserc
+# Deployment Scripts
+deploy*.shcheck-jquery.sh
 firebase.json
 dist

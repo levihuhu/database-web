@@ -132,10 +132,11 @@ const BrowseCourses = () => {
       ) : (
         <Row gutter={[16, 16]}>
           {filteredCourses.map(course => (
-            <Col span={8} key={course.course_id}>
+            <Col xs={24} sm={12} md={8} key={course.course_id}>
               <Card
                 hoverable
-                style={{ height: '100%' }}
+                style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: '380px' }}
+                bodyStyle={{ flexGrow: 1, display: 'flex', flexDirection: 'column' }}
                 actions={[
                   course.is_enrolled ? (
                     <Button 
@@ -166,17 +167,19 @@ const BrowseCourses = () => {
                   padding: '10px',
                   background: '#f0f2f5',
                   textAlign: 'center',
-                  marginBottom: '16px'
+                  marginBottom: '16px',
+                  flexShrink: 0
                 }}>
                   <DatabaseOutlined style={{ fontSize: '48px', color: '#1890ff' }} />
                 </div>
                 <Card.Meta
+                  style={{ flexGrow: 1, display: 'flex', flexDirection: 'column' }}
                   title={
-                    <div style={{ marginBottom: 8 }}>
-                      <div style={{ whiteSpace: 'normal', wordBreak: 'break-word', marginBottom: 4 }}>
+                    <div style={{ marginBottom: 8, flexShrink: 0 }}>
+                      <Paragraph ellipsis={{ rows: 2, tooltip: course.course_name }} style={{ marginBottom: 4, fontWeight: 'bold' }}>
                         {course.course_name}
-                      </div>
-                      <Space>
+                      </Paragraph>
+                      <Space wrap size={[4, 4]}>
                         <Tag color="blue">{course.course_code}</Tag>
                         <Tag color="green">Active</Tag>
                         {course.is_enrolled && <Tag color="purple">Enrolled</Tag>}
@@ -184,12 +187,12 @@ const BrowseCourses = () => {
                     </div>
                   }
                   description={
-                    <>
-                      <Paragraph ellipsis={{ rows: 2 }}>
+                    <div style={{ flexGrow: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                      <Paragraph ellipsis={{ rows: 3, tooltip: course.course_description || 'No description available' }} style={{ marginBottom: 'auto' }}>
                         {course.course_description || 'No description available'}
                       </Paragraph>
-                      <Divider style={{ margin: '8px 0' }} />
-                      <div>
+                      <div style={{ flexShrink: 0 }}>
+                        <Divider style={{ margin: '8px 0' }} />
                         <Space direction="vertical" size={4} style={{ width: '100%' }}>
                           <div>
                             <Text type="secondary">
@@ -197,14 +200,14 @@ const BrowseCourses = () => {
                             </Text>
                           </div>
                           <div>
-                            <Space>
-                              <Text type="secondary">Modules: {course.total_modules}</Text>
-                              <Text type="secondary">Exercises: {course.total_exercises}</Text>
+                            <Space wrap size={[8, 4]}>
+                              <Text type="secondary">Modules: {course.total_modules ?? 0}</Text>
+                              <Text type="secondary">Exercises: {course.total_exercises ?? 0}</Text>
                             </Space>
                           </div>
                         </Space>
                       </div>
-                    </>
+                    </div>
                   }
                 />
               </Card>

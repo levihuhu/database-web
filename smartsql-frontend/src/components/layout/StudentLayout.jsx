@@ -12,6 +12,7 @@ import {
   DashboardOutlined
 } from '@ant-design/icons';
 import { Link, useLocation, useNavigate, Outlet } from 'react-router-dom';
+import ChatWidget from '../common/ChatWidget';
 
 const { Header, Sider, Content } = Layout;
 const { Title, Text } = Typography;
@@ -180,11 +181,13 @@ const StudentLayout = ({ children }) => {
             minHeight: 280,
             borderRadius: 4,
             background: '#fff',
-            overflow: 'auto'
+            overflow: 'auto',
+            position: 'relative',
           }}
         >
           <Outlet />
         </Content>
+        <ChatWidget />
       </Layout>
     </Layout>
   );

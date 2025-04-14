@@ -48,8 +48,10 @@ export default function HomeLogin() {
       if (res.ok && result.status === 'success') {
         console.log("✅ Login API Success. Calling context login...");
         login(result.data);
+        message.success(result.message || 'Login successful! Redirecting...');
       } else {
-        message.error(result.message || '登录失败');
+        setLoading(false);
+        message.error(result.message || 'Login failed');
       }
     } catch (error) {
       console.error('Login error:', error);

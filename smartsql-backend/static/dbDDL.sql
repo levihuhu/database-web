@@ -137,15 +137,18 @@ CREATE TABLE Module_Exercise (
 
 
 CREATE TABLE Student_Exercise (
-	id INT AUTO_INCREMENT PRIMARY KEY,
-	student_id INT NOT NULL,
-	exercise_id INT NOT NULL,
-	submitted_answer TEXT,
-	is_correct BOOLEAN,
-	completed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-	FOREIGN KEY (student_id) REFERENCES Student(student_id) ON DELETE CASCADE,
-	FOREIGN KEY (exercise_id) REFERENCES Exercise(exercise_id) ON DELETE CASCADE
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    student_id INT NOT NULL,
+    exercise_id INT NOT NULL,
+    submitted_answer TEXT,
+    is_correct BOOLEAN,
+    score DECIMAL(5,2),         -- 例如5.2表示最多5位数字，小数点后2位
+    ai_feedback TEXT,           -- 存储AI反馈
+    completed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (student_id) REFERENCES Student(student_id) ON DELETE CASCADE,
+    FOREIGN KEY (exercise_id) REFERENCES Exercise(exercise_id) ON DELETE CASCADE
 );
+
 
 -- Student_Progress
 CREATE TABLE Student_Progress (
