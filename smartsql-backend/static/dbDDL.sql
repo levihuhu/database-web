@@ -22,7 +22,7 @@ DROP TABLE IF EXISTS Instructor;
 DROP TABLE IF EXISTS Student;
 DROP TABLE IF EXISTS Users;
 CREATE TABLE Users (
-    user_id INT PRIMARY KEY,
+    user_id INT AUTO_INCREMENT PRIMARY KEY,
     first_name VARCHAR(50) NOT NULL,
     last_name VARCHAR(50) NOT NULL,
     username VARCHAR(50) NOT NULL,
@@ -31,7 +31,6 @@ CREATE TABLE Users (
     user_type ENUM('Student', 'Instructor') NOT NULL,
     profile_info TEXT
 );
-
 
 -- Student
 CREATE TABLE Student (
@@ -146,15 +145,6 @@ CREATE TABLE Student_Exercise (
 	completed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (student_id) REFERENCES Student(student_id) ON DELETE CASCADE,
 	FOREIGN KEY (exercise_id) REFERENCES Exercise(exercise_id) ON DELETE CASCADE
-);
--- Knowledge_Graph
-CREATE TABLE Knowledge_Graph (
-    graph_id INT PRIMARY KEY,
-    student_id INT NOT NULL,
-    weak_areas TEXT,
-    suggestions TEXT,
-    FOREIGN KEY (student_id)
-        REFERENCES Student (student_id)
 );
 
 -- Student_Progress

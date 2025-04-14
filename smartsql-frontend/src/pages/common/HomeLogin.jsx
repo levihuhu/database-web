@@ -10,25 +10,29 @@ import {
   message,
   Modal,
   Row,
-  Col
+  Col,
 } from 'antd';
 import { handleError } from "../../services/utils.js";
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
 
 const { Title, Text } = Typography;
 const BASE_URL = import.meta.env.VITE_API_BASE_URL;
+const isProduction = import.meta.env.MODE === 'production';
+
 
 export default function HomeLogin() {
-  const [role, setRole] = useState('instructor');
-  const [identifier, setIdentifier] = useState('');
-  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [form]  = Form.useForm();
-  const navigate = useNavigate();
+  const { login } = useAuth();
+
+  
+  console.log("✅ 当前环境变量:", import.meta.env.MODE);
+  console.log("✅ 当前环境变量:", import.meta.env.VITE_API_BASE_URL);
 
   const handleLogin = async (values) => {
     const { identifier, password, role } = values;
-
+    console.log("handleLogin triggered, values:", values);
     setLoading(true);
     try {
       const res = await fetch(`${BASE_URL}/api/login/`, {
@@ -41,26 +45,15 @@ export default function HomeLogin() {
 
       const result = await res.json();
 
-      if (res.ok) {
-        const { access, refresh, user_id, username,role } = result.data;
-
-        localStorage.setItem('access', access);
-        localStorage.setItem('refresh', refresh);
-        localStorage.setItem('user_id', user_id);
-        localStorage.setItem('username', username);
-        localStorage.setItem('role', role);
-
-        if (role === 'instructor') {
-          navigate('/teacher');
-        } else {
-          navigate('/student/sql');
-        }
+      if (res.ok && result.status === 'success') {
+        console.log("✅ Login API Success. Calling context login...");
+        login(result.data);
       } else {
         message.error(result.message || '登录失败');
       }
     } catch (error) {
       console.error('Login error:', error);
-      message.error(error.message);
+      message.error(handleError(error));
     } finally {
       setLoading(false);
     }
@@ -83,7 +76,7 @@ export default function HomeLogin() {
                 </Title>
                 <Text style={{ color: '#cbd5e1' }}>Practice, Get Hints, Learn Fast</Text>
                 <img
-                  src="/student-illustration.png"
+                  src="./student-illustration.png"
                   alt="Illustration"
                   style={{ width: '80%', marginTop: '2rem', borderRadius: '12px', boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)' }}
                 />
@@ -118,12 +111,6 @@ export default function HomeLogin() {
                 >
                   <Input.Password placeholder="Enter your password" />
                 </Form.Item>
-
-                <Form.Item>
-                  <Checkbox>Remember me</Checkbox>
-                  <a style={{ float: 'right' }} href="#">Forgot password?</a>
-                </Form.Item>
-
                 <Form.Item>
                   <Button type="primary" htmlType="submit" loading={loading} block>
                     Login
@@ -131,9 +118,10 @@ export default function HomeLogin() {
                 </Form.Item>
               </Form>
 
-              <Text type="secondary" style={{ fontSize: '12px', display: 'block', textAlign: 'center' }}>
-                Don't have an account? <a href="/signup/">Sign up</a>
-              </Text>
+              <div style={{ textAlign: 'center', marginTop: '1rem' }}>
+                <Text type="secondary">Don't have an account? </Text>
+                <Link to="/signup">Sign up</Link>
+              </div>
             </Col>
           </Row>
         </Card>
