@@ -384,7 +384,7 @@ Student's SQL Query:
 
 Output your evaluation in JSON format with two keys:
 1.  "is_correct": boolean (true if logically equivalent, false otherwise).
-2.  "score": integer (100 for correct, 0 for incorrect).
+2.  "score": integer (100 for correct, if incorrect, please give a score between 0 and 100 based on the correctness of the query).
 3.  "feedback": string (Provide a brief explanation for your reasoning, especially if incorrect).
 
 Example Response:
@@ -821,16 +821,18 @@ def student_dashboard_api(request):
                 course_dict['next_deadline'] = "2024-08-01" # Placeholder
                 recent_courses.append(course_dict)
             print("到达这里了吗？")
-            # Fetch recent exercises (last 5 attempts)
+            # Fetch recent exercises (last 5 attempts), now including score and feedback
             cursor.execute("""
-                SELECT 
+                SELECT
                     se.id AS student_exercise_id,
                     e.exercise_id,
-                    e.title, 
-                    e.difficulty, 
-                    se.is_correct, 
-                    se.completed_at, 
-                    c.course_name, 
+                    e.title,
+                    e.difficulty,
+                    se.is_correct,
+                    se.completed_at,
+                    se.score,         -- Added score
+                    se.ai_feedback,   -- Added ai_feedback
+                    c.course_name,
                     m.module_name,
                     c.course_id,
                     m.module_id
@@ -846,18 +848,12 @@ def student_dashboard_api(request):
                 WHERE se.student_id = %s AND se.completed_at IS NOT NULL
                 ORDER BY se.completed_at DESC
                 LIMIT 5
-
             """, [student_id])
-            
-            recent_exercises = []
-            columns = [col[0] for col in cursor.description]
-            for row in cursor.fetchall():
-                exercise_dict = dict(zip(columns, row))
-                # 添加练习相关信息（示例）
-                exercise_dict['average_time'] = "5 min" # Placeholder
-                exercise_dict['tags'] = ["SQL", "SELECT"] # Placeholder
-                recent_exercises.append(exercise_dict)
-                
+            def dictfetchall(cursor):
+                columns = [col[0] for col in cursor.description]
+                return [dict(zip(columns, row)) for row in cursor.fetchall()]
+            recent_exercises = dictfetchall(cursor) # Fetch all results directly
+
         return Response({
             'status': 'success',
             'data': {
@@ -865,7 +861,7 @@ def student_dashboard_api(request):
                 'course_stats': course_data,
                 'exercise_stats': exercise_data,
                 'recent_courses': recent_courses,
-                'recent_exercises': recent_exercises
+                'recent_exercises': recent_exercises # Now includes score and feedback
             }
         }, status=status.HTTP_200_OK)
             
