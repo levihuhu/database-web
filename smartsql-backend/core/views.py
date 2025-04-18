@@ -41,7 +41,7 @@ def signup_api(request):
 
     if errors:
         return Response({'status': 'error', 'errors': errors}, status=status.HTTP_400_BAD_REQUEST)
-    print("👌🏻")
+    
     # --- Uniqueness Check (using raw SQL) ---
     try:
         with connection.cursor() as cursor:

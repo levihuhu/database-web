@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Row, Col, Card, Typography, Statistic, Progress, Table, Tag, Spin, List, Space, Empty } from 'antd';
+import { Row, Col, Card, Typography, Statistic, Progress, Table, Tag, Spin, List, Space, Empty, Tooltip } from 'antd';
 import { 
   BookOutlined, 
   CheckCircleOutlined, 
@@ -161,9 +161,6 @@ const StudentDashboard = () => {
               strokeColor={{ '0%': '#108ee9', '100%': '#87d068' }} 
               style={{ marginTop: 16 }} 
             />
-            <div style={{ marginTop: 8 }}>
-              <Text type="secondary">Accuracy Rate: {exercise_stats.accuracy_rate}%</Text>
-            </div>
           </Card>
         </Col>
       </Row>
@@ -241,6 +238,7 @@ const StudentDashboard = () => {
                   <List.Item
                     onClick={() => navigate(`/student/courses/${item.course_id}/modules/${item.module_id}/exercises/${item.exercise_id}`)}
                     style={{ cursor: 'pointer' }}
+                    actions={[<RightOutlined />]}
                   >
                     <List.Item.Meta
                       avatar={<DatabaseOutlined style={{ fontSize: 32, color: '#722ed1' }} />}
@@ -250,31 +248,31 @@ const StudentDashboard = () => {
                           <Tag color={getDifficultyColor(item.difficulty)}>
                             {item.difficulty}
                           </Tag>
-                          <Tag color={item.is_correct ? '#52c41a' : '#f5222d'}>
-                            {item.is_correct ? 'Correct' : 'Incorrect'}
-                          </Tag>
                         </Space>
                       }
                       description={
-                        <div>
-                          <div>
-                            <Text type="secondary">Course: {item.course_name} · Module: {item.module_name}</Text>
-                          </div>
-                          <div style={{ marginTop: 4 }}>
+                        <Space direction="vertical" size="small" style={{ width: '100%' }}>
+                          <Tag icon={item.is_correct ? <CheckCircleOutlined /> : <ClockCircleOutlined />} color={item.is_correct ? 'success' : 'warning'}>
+                            {item.is_correct ? 'Correct' : 'Attempted'} on {new Date(item.completed_at).toLocaleDateString()}
+                          </Tag>
+                          {(item.score !== null && item.score !== undefined) && (
                             <Text type="secondary">
-                              <ClockCircleOutlined /> {new Date(item.completed_at).toLocaleString('en-US', { 
-                                year: 'numeric', 
-                                month: '2-digit', 
-                                day: '2-digit',
-                                hour: '2-digit',
-                                minute: '2-digit' 
-                              })}
+                              Score: {item.score}
                             </Text>
-                          </div>
-                        </div>
+                          )}
+                          {item.ai_feedback && (
+                            <Tooltip title={item.ai_feedback} placement="topLeft">
+                              <Text ellipsis type="secondary" style={{ maxWidth: '100%' }}>
+                                Feedback: {item.ai_feedback}
+                              </Text>
+                            </Tooltip>
+                          )}
+                          <Text type="secondary" style={{ fontSize: '12px' }}>
+                             In: {item.course_name} / {item.module_name}
+                          </Text>
+                        </Space>
                       }
                     />
-                    <RightOutlined />
                   </List.Item>
                 )}
               />
