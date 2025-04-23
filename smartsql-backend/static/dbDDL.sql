@@ -21,6 +21,8 @@ DROP TABLE IF EXISTS Question;
 DROP TABLE IF EXISTS Instructor;
 DROP TABLE IF EXISTS Student;
 DROP TABLE IF EXISTS Users;
+
+-- Define Users, Student, Instructor first due to dependencies
 CREATE TABLE Users (
     user_id INT AUTO_INCREMENT PRIMARY KEY,
     first_name VARCHAR(50) NOT NULL,
@@ -32,21 +34,21 @@ CREATE TABLE Users (
     profile_info TEXT
 );
 
--- Student
 CREATE TABLE Student (
     student_id INT PRIMARY KEY,
     FOREIGN KEY (student_id)
         REFERENCES Users (user_id)
+        ON DELETE CASCADE -- Added ON DELETE CASCADE for consistency
 );
 
--- Instructor
 CREATE TABLE Instructor (
     instructor_id INT PRIMARY KEY,
     FOREIGN KEY (instructor_id)
         REFERENCES Users (user_id)
+        ON DELETE CASCADE -- Added ON DELETE CASCADE for consistency
 );
 
--- Course
+-- Define Course, Module, Exercise next
 CREATE TABLE Course (
     course_id INT AUTO_INCREMENT PRIMARY KEY,
     course_name VARCHAR(100) NOT NULL,
@@ -54,13 +56,34 @@ CREATE TABLE Course (
     instructor_id INT NOT NULL,
     course_description TEXT,
     year INT,
-    term TINYINT, 
-    state ENUM('active', 'complete', 'discontinued'), 
+    term TINYINT,
+    state ENUM('active', 'complete', 'discontinued'),
     FOREIGN KEY (instructor_id)
         REFERENCES Instructor (instructor_id)
 );
 
--- Create Enrollment Table (Tracks student course registration)
+CREATE TABLE Module (
+    module_id INT PRIMARY KEY AUTO_INCREMENT,
+    course_id INT,
+    module_name VARCHAR(255) NOT NULL,
+    module_description TEXT,
+    FOREIGN KEY (course_id) REFERENCES Course(course_id) ON DELETE SET NULL
+);
+
+CREATE TABLE Exercise (
+    exercise_id INT AUTO_INCREMENT PRIMARY KEY,
+    title VARCHAR(255),
+    description TEXT,
+    hint TEXT,
+    expected_answer TEXT,
+    difficulty VARCHAR(20),
+    table_schema JSON,
+    tags VARCHAR(255),
+    created_by INT NOT NULL,
+    FOREIGN KEY (created_by) REFERENCES Instructor(instructor_id)
+);
+
+-- Define other tables that depend on the above
 CREATE TABLE Enrollment (
     enrollment_id INT PRIMARY KEY AUTO_INCREMENT,
     student_id INT,
@@ -70,16 +93,6 @@ CREATE TABLE Enrollment (
     FOREIGN KEY (course_id) REFERENCES Course(course_id) ON DELETE CASCADE
 );
 
--- Create Module Table (Tracks modules within a course)
-CREATE TABLE Module (
-    module_id INT PRIMARY KEY AUTO_INCREMENT,
-    course_id INT,
-    module_name VARCHAR(255) NOT NULL,
-    module_description TEXT,
-    FOREIGN KEY (course_id) REFERENCES Course(course_id) ON DELETE SET NULL
-);
-
--- Score
 CREATE TABLE Score (
     score_id INT AUTO_INCREMENT PRIMARY KEY,
     student_id INT NOT NULL,
@@ -113,19 +126,6 @@ CREATE TABLE Announcement (
     FOREIGN KEY (course_id) REFERENCES Course(course_id)
 );
 
-CREATE TABLE Exercise (
-    exercise_id INT AUTO_INCREMENT PRIMARY KEY,
-    title VARCHAR(255),
-    description TEXT,
-    hint TEXT,
-    expected_answer TEXT,
-    difficulty VARCHAR(20),
-    table_schema JSON,
-    tags VARCHAR(255),
-    created_by INT NOT NULL,
-    FOREIGN KEY (created_by) REFERENCES Instructor(instructor_id)
-);
-
 CREATE TABLE Module_Exercise (
     id INT AUTO_INCREMENT PRIMARY KEY,
     module_id INT NOT NULL,
@@ -134,7 +134,6 @@ CREATE TABLE Module_Exercise (
     FOREIGN KEY (module_id) REFERENCES Module(module_id) ON DELETE CASCADE,
     FOREIGN KEY (exercise_id) REFERENCES Exercise(exercise_id) ON DELETE CASCADE
 );
-
 
 CREATE TABLE Student_Exercise (
 	id INT AUTO_INCREMENT PRIMARY KEY,
@@ -147,7 +146,6 @@ CREATE TABLE Student_Exercise (
 	FOREIGN KEY (exercise_id) REFERENCES Exercise(exercise_id) ON DELETE CASCADE
 );
 
--- Student_Progress
 CREATE TABLE Student_Progress (
     progress_id INT PRIMARY KEY,
     student_id INT NOT NULL,
@@ -160,6 +158,32 @@ CREATE TABLE Student_Progress (
     FOREIGN KEY (course_id)
         REFERENCES Course (course_id)
 );
+
+-- Corrected Knowledge_Graph table definition
+CREATE TABLE Knowledge_Graph (
+    graph_id INT AUTO_INCREMENT PRIMARY KEY,
+    student_id INT NOT NULL,
+    weak_areas TEXT,
+    suggestions TEXT,
+    FOREIGN KEY (student_id)
+        REFERENCES Student (student_id)
+        ON DELETE CASCADE
+);
+
+-- Added Error_Log table definition (based on function usage)
+CREATE TABLE Error_Log (
+   log_id INT AUTO_INCREMENT PRIMARY KEY,
+   student_id INT NOT NULL,
+   exercise_id INT, -- Assuming it links to an exercise
+   error_type VARCHAR(100),
+   error_message TEXT,
+   timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+   FOREIGN KEY (student_id) REFERENCES Student(student_id) ON DELETE CASCADE,
+   FOREIGN KEY (exercise_id) REFERENCES Exercise(exercise_id) ON DELETE SET NULL -- Allow exercise deletion
+);
+
+-- Add CREATE TABLE for Competition, Competition_Participants, Competition_Questions, Real_Time_Activity if needed
+-- e.g. CREATE TABLE Competition (...); etc.
 
 -- Trigger
 -- Set the rank for Score for new student
