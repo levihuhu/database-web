@@ -9,7 +9,7 @@ from config import messages as msg
 from django.db.models import Q
 from django.db import connection, transaction
 import re
-from django.contrib.auth.hashers import make_password
+from django.contrib.auth.hashers import make_password, check_password
 from django.db import IntegrityError
 
 
@@ -41,6 +41,10 @@ def signup_api(request):
 
     if errors:
         return Response({'status': 'error', 'errors': errors}, status=status.HTTP_400_BAD_REQUEST)
+    
+    # --- Hash the password ---
+    hashed_password = make_password(password) # Hash the password
+
     print("👌🏻")
     # --- Uniqueness Check (using raw SQL) ---
     try:
@@ -59,11 +63,11 @@ def signup_api(request):
         # --- Create User and Student Record (using raw SQL) --- 
         with transaction.atomic(): # Keep transaction for atomicity
             with connection.cursor() as cursor:
-                # Insert into Users table
+                # Insert into Users table using the hashed password
                 cursor.execute("""
                     INSERT INTO Users (username, email, password, first_name, last_name, user_type, profile_info)
                     VALUES (%s, %s, %s, %s, %s, %s, %s)
-                """, [username, email, password, first_name, last_name, user_type, profile_info])
+                """, [username, email, hashed_password, first_name, last_name, user_type, profile_info])
                 
                 # Get the user_id of the newly inserted user
                 # Note: cursor.lastrowid is specific to some backends like MySQL for AUTO_INCREMENT
@@ -107,28 +111,57 @@ def signup_api(request):
 def login_api(request):
     try:
         identifier = request.data.get('identifier')
-        password = request.data.get('password')
+        password = request.data.get('password') # Plain text password from form
         role = request.data.get('role')
-
+        print(f"[Login Attempt] Identifier: {identifier}, Role: {role}, Password Provided: {bool(password)}") # Log received data
 
         if not identifier or not password or not role:
+            print("[Login Fail] Missing identifier, password, or role")
             return Response({'error': msg.MISSING_FIELD}, status=status.HTTP_400_BAD_REQUEST)
 
-        # if '@' in identifier:
-        #     user = authenticate(request, email=identifier, password=password)
-        # else:
-        #     user = authenticate(request, username=identifier, password=password)
-
+        # --- TEMPORARY DEBUGGING: Check if user exists by username/identifier ALONE --- 
         try:
+            debug_user = Users.objects.get(Q(username=identifier) | Q(email=identifier))
+            print(f"[DEBUG] Found user by identifier ONLY: ID={debug_user.user_id}, Username={debug_user.username}, Stored Role='{debug_user.user_type}', Stored Hash={debug_user.password[:15]}...")
+        except Users.DoesNotExist:
+            print(f"[DEBUG] User.DoesNotExist even when searching by identifier '{identifier}' ALONE.")
+            # If not found by identifier alone, it definitely won't match the role check later
+            return Response({'status': 'error', 'message': msg.LOGIN_WRONG_PASSWORD + " (User identifier not found)"},
+                            status=status.HTTP_401_UNAUTHORIZED)
+        except Exception as debug_e:
+            print(f"[DEBUG] Error during identifier-only check: {debug_e}")
+        # --- END TEMPORARY DEBUGGING ---
+
+        # Fetch user by identifier (username or email) and role first
+        user = None # Initialize user to None
+        try:
+            print(f"[Login Attempt] Querying for user: Identifier='{identifier}', Role='{role}'")
             user = Users.objects.get(
                 Q(username=identifier) | Q(email=identifier),
-                password=password,
                 user_type=role
             )
+            print(f"[Login Attempt] User Found: ID={user.user_id}, Username={user.username}, Stored Password Hash: {user.password[:15]}..." ) # Log found user (showing start of hash)
         except Users.DoesNotExist:
+            # This block should be indented one level from 'except'
+            print(f"[Login Fail] User.DoesNotExist for Identifier='{identifier}', Role='{role}'")
+            # This return should align with the print above it
             return Response({'status': 'error', 'message': msg.LOGIN_WRONG_PASSWORD},
                             status=status.HTTP_401_UNAUTHORIZED)
 
+        # This line should be dedented to align with the 'try' block above
+        password_match = check_password(password, user.password)
+        # This print should align with the line above it
+        print(f"[Login Attempt] check_password result for user {user.username}: {password_match}")
+        # This 'if' should align with the lines above it
+        if not password_match:
+            # This block should be indented one level from 'if'
+            print(f"[Login Fail] Password mismatch for user {user.username}")
+            # This return should align with the print above it
+            return Response({'status': 'error', 'message': msg.LOGIN_WRONG_PASSWORD},
+                            status=status.HTTP_401_UNAUTHORIZED)
+
+        # This print should be dedented to align with the 'if not password_match:' line
+        print(f"[Login Success] Generating tokens for user {user.username}")
         refresh = RefreshToken.for_user(user)
         refresh["user_id"] = user.user_id
         refresh["username"] = user.username
